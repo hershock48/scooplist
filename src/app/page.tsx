@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import ScooplistMark from "@/components/Logo";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
 
@@ -15,7 +16,8 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6 py-16">
-      <p className="font-[family-name:var(--font-display)] text-3xl font-bold text-berry">
+      <p className="flex items-center gap-3 font-[family-name:var(--font-display)] text-3xl font-bold text-berry">
+        <ScooplistMark size={44} />
         Scooplist
       </p>
       <h1 className="mt-4 font-[family-name:var(--font-display)] text-4xl font-semibold leading-tight">

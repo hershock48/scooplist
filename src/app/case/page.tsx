@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import CaseBoard from "@/components/CaseBoard";
+import ScooplistMark from "@/components/Logo";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
 import { seedIfEmpty } from "@/lib/seed";
@@ -29,8 +30,9 @@ export default async function CasePage() {
       <header className="flex items-center justify-between gap-3">
         <Link
           href="/case"
-          className="font-[family-name:var(--font-display)] text-2xl font-bold text-berry"
+          className="flex items-center gap-2 font-[family-name:var(--font-display)] text-2xl font-bold text-berry"
         >
+          <ScooplistMark size={30} />
           Scooplist
         </Link>
         <nav className="flex items-center gap-4 text-sm font-semibold">

@@ -1,7 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- A scoop on a cone, in the brand berry — the whole product in 64px. -->
-  <circle cx="32" cy="22" r="16" fill="#D64570"/>
-  <circle cx="24" cy="16" r="4" fill="#FDFBF7" opacity="0.5"/>
-  <path d="M17 34 L32 60 L47 34 Z" fill="#B98A4A"/>
-  <path d="M22 38 L42 38 M25 44 L39 44 M28 50 L36 50" stroke="#8a6536" stroke-width="2"/>
+  <!--
+    The Scooplist mark. Raspberry #E84D8A sampled from the glazedweb donut
+    icing; white-arc sheen and the long rounded drip are the parent mark's
+    vocabulary. Mirror of src/components/Logo.tsx - keep them in sync.
+  -->
+  <path d="M 18 33 L 46 33 L 32 61 Z" fill="#B98A4A"/>
+  <path d="M 22 40 L 42 40 M 25 46 L 39 46 M 28 52 L 36 52 M 26 36 L 32 48 M 38 36 L 33 46" stroke="#8a6536" stroke-width="2" fill="none"/>
+  <path fill="#E84D8A" d="M 15 26 A 17 17 0 1 1 49 26 L 49 30 C 47 34, 44 34, 43 31 C 42 29, 41 30, 41 33 L 41 40 C 41 44, 36.5 44, 36.5 40 L 36.5 34 C 36.5 31, 35 31, 34 33 C 33 35, 31 35, 30 33 C 29 31, 27.5 31, 27.5 34 L 27.5 48 C 27.5 52.5, 22.5 52.5, 22.5 48 L 22.5 33 C 22.5 30, 21 29, 20 31 C 19 34, 16 34, 15 30 Z"/>
+  <path d="M 20 18 A 13.5 13.5 0 0 1 30 9.5" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" opacity="0.8"/>
 </svg>

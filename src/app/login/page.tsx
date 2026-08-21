@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import ScooplistMark from "@/components/Logo";
 import { isAuthed } from "@/lib/auth";
 
 export const metadata = { title: "Sign in" };
@@ -17,7 +18,8 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-berry">
+      <p className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-2xl font-bold text-berry">
+        <ScooplistMark size={34} />
         Scooplist
       </p>
       <h1 className="mt-3 text-xl font-semibold">Shop PIN</h1>
