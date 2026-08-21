@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@theme {
+  /*
+    Scooplist's own palette — deliberately NOT any client's. The tool serves
+    every shop, so it wears neutral cream and one berry accent.
+
+    CONTRAST, MEASURED (against cream #FDFBF7):
+      berry       #B93A60   5.6  — buttons, links, small text. AA at any size.
+      berry-brt   #D64570   4.1  — fills, chips, large display only. Not body.
+      ink         #221D27  15.4  — body text.
+      ink-soft    #4A424F   8.9  — secondary text.
+    Board (TV) surfaces are ink-dark #17131C with cream text (14.9).
+  */
+  --color-berry: #B93A60;
+  --color-berry-bright: #D64570;
+  --color-ink: #221D27;
+  --color-ink-soft: #4A424F;
+  --color-cream: #FDFBF7;
+  --color-cream-dim: #F5EFE6;
+  --color-mint: #7FC8A9;
+  --color-board: #17131C;
+
+  --font-display: var(--font-display), ui-serif, Georgia, serif;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+
+  --radius-card: 1.1rem;
+  --radius-panel: 1.6rem;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background-color: var(--color-mint);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-berry);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  /* Berry is the background on dark surfaces; cream stays visible there. */
+  .bg-board :focus-visible,
+  .bg-berry :focus-visible {
+    outline-color: var(--color-cream);
+  }
+}
+
+@layer components {
+  /* 48px tall: this app's primary user has cold hands. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    border-radius: 9999px;
+    background-color: var(--color-berry);
+    padding: 0.7rem 1.6rem;
+    font-weight: 600;
+    color: var(--color-cream);
+    transition: background-color 0.15s ease, transform 0.15s ease;
+  }
+  .btn:hover {
+    background-color: var(--color-berry-bright);
+    transform: translateY(-1px);
+  }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    border-radius: 9999px;
+    border: 1.5px solid color-mix(in srgb, var(--color-ink) 25%, transparent);
+    padding: 0.7rem 1.6rem;
+    font-weight: 600;
+    color: var(--color-ink);
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-ghost:hover {
+    border-color: var(--color-berry);
+    color: var(--color-berry);
+  }
+
+  .card {
+    border-radius: var(--radius-card);
+    border: 1px solid color-mix(in srgb, var(--color-ink) 10%, transparent);
+    background: white;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  .field {
+    width: 100%;
+    border-radius: 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--color-ink) 22%, transparent);
+    background: white;
+    padding: 0.7rem 0.9rem;
+    color: var(--color-ink);
+    min-height: 48px;
+  }
+  .field:focus {
+    border-color: var(--color-berry);
+    outline: none;
+  }
+}

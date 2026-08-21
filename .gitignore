@@ -1,0 +1,11 @@
+/node_modules
+/.next
+/out
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+# A bare .env* would silently ignore the example file too (glazedweb's own
+# documented mistake). Keep the negation.
+.env*
+!.env.example
+.vercel
