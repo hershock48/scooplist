@@ -76,9 +76,12 @@ integration.
 
 ## Before this is a product
 
-- [ ] Set `SCOOPLIST_PIN`, `DATABASE_URL` (Neon), `BLOB_READ_WRITE_TOKEN` in Vercel
+- [ ] Set `SCOOPLIST_PIN`, `SCOOPLIST_SECRET`, `DATABASE_URL` (Neon), and
+      `BLOB_READ_WRITE_TOKEN` in Vercel
 - [ ] Remove the noindex in `next.config.ts` when it gets a real domain
-- [ ] Wire truenorth's flavor board to the feed (env-flagged, static fallback)
+- [x] Wire truenorth's flavor board to the feed — done, `truenorth/src/data/
+      liveCase.ts` (env-flagged via SCOOPLIST_FEED_URL, static fallback);
+      set the env on the truenorth Vercel project once this app is public
 - [ ] Case history view ("what left the case, when") — the data is already kept
 - [ ] Second tenant → extract multi-tenancy, not before
 - [ ] QR counter menu page (the feed + a template; an evening)
