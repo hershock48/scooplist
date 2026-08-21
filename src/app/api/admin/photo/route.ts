@@ -37,6 +37,11 @@ export async function POST(request: Request) {
   if (data.length > MAX_BASE64) {
     return NextResponse.json({ error: "Photo too large — try again, it will re-compress." }, { status: 413 });
   }
+  // Real base64 or nothing: Buffer.from silently skips invalid characters,
+  // which would store a garbage "photo" and report success.
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data) || data.length % 4 !== 0) {
+    return NextResponse.json({ error: "That photo didn't come through — try again." }, { status: 400 });
+  }
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const { put } = await import("@vercel/blob");

@@ -36,16 +36,15 @@ export async function POST(request: Request) {
   }
 
   if (b.action === "in") {
-    const open = await store.listCase(location.id);
-    if (!open.some((e) => e.flavorId === flavor.id)) {
-      await store.addToCase({
-        id: newId("case"),
-        locationId: location.id,
-        flavorId: flavor.id,
-        addedAt: Date.now(),
-        removedAt: null,
-      });
-    }
+    // Idempotency lives in the STORE (unique partial index / in-store
+    // check) — a check here would be a race two double-tap POSTs can lose.
+    await store.addToCase({
+      id: newId("case"),
+      locationId: location.id,
+      flavorId: flavor.id,
+      addedAt: Date.now(),
+      removedAt: null,
+    });
     return NextResponse.json({ ok: true });
   }
 

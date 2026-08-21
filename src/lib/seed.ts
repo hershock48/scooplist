@@ -58,10 +58,30 @@ const SEED: SeedRow[] = [
 ];
 
 export async function seedIfEmpty(): Promise<void> {
-  const store = getStore();
-  const existing = await store.listFlavors();
-  if (existing.length > 0) return;
+  /*
+    Three layers, cheapest first: a per-process flag (free after the first
+    hit), a SELECT 1 probe (never the full jsonb library — inline photos make
+    that megabytes), and the store's once() guard with a re-check inside, so
+    two cold instances racing a fresh database cannot both seed it.
+  */
+  const g = globalThis as typeof globalThis & { __scooplistSeeded?: boolean };
+  if (g.__scooplistSeeded) return;
 
+  const store = getStore();
+  if (await store.hasAnyFlavors()) {
+    g.__scooplistSeeded = true;
+    return;
+  }
+
+  await store.once(async () => {
+    if (await store.hasAnyFlavors()) return;
+    await seed();
+  });
+  g.__scooplistSeeded = true;
+}
+
+async function seed(): Promise<void> {
+  const store = getStore();
   const now = Date.now();
   const shops = locations();
   const ids: { id: string; category: CategoryKey }[] = [];

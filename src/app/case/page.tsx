@@ -42,6 +42,8 @@ export default async function CasePage() {
           </Link>
           <Link
             href={`/board/${shops[0]?.id ?? ""}`}
+            target="_blank"
+            rel="noopener"
             className="text-ink-soft underline-offset-4 hover:text-berry hover:underline"
           >
             TV board ↗
@@ -49,10 +51,12 @@ export default async function CasePage() {
         </nav>
       </header>
 
+      {/* Shop voice out front; the Vercel specifics live in the README for
+          the person who can actually act on them. */}
       {store.backend === "memory" ? (
         <p className="card mt-4 border-berry/40 bg-berry/5 px-4 py-3 text-sm font-medium text-berry">
-          Demo storage: no database is connected, so changes vanish on restart.
-          One click in Vercel (Storage → Neon) makes it permanent.
+          Demo mode: changes here aren&apos;t saved permanently yet. Ask your
+          web person to switch on storage — it&apos;s one click for them.
         </p>
       ) : null}
 

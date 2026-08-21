@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { ALLERGENS, CATEGORIES, type Allergen, type CategoryKey, type Flavor, type Size } from "@/lib/domain";
 
 /**
- * The library: everything the shop has ever churned, edited in place.
- * Photos are resized in the browser before upload (a phone camera shot is
- * 4MB the server never needs), and retiring beats deleting — a retired
- * flavor keeps its history and can come back next summer.
+ * The library: everything the shop has ever churned, edited in place — and
+ * created here too, because prepping next week's menu from the couch must
+ * not require boarding a flavor at a live shop. Photos are resized in the
+ * browser before upload (a phone camera shot is 4MB the server never
+ * needs), every failure says so out loud, and retiring beats deleting — a
+ * retired flavor keeps its history and can come back next summer.
  */
 
 type Props = { flavors: Flavor[] };
@@ -39,10 +41,19 @@ async function resizeToJpeg(file: File): Promise<{ data: string; contentType: st
 export default function FlavorLibrary({ flavors }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const [showRetired, setShowRetired] = useState(false);
   const [error, setError] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newCategory, setNewCategory] = useState<CategoryKey>("handscooped");
+  /** The open editor sets this; collapsing a dirty editor asks first. */
+  const dirtyRef = useRef(false);
+  /** Synchronous double-tap latch — `busy` state is async and misses same-tick taps. */
+  const inFlightRef = useRef(false);
+
+  const working = busy || pending;
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -51,29 +62,98 @@ export default function FlavorLibrary({ flavors }: Props) {
       .filter((f) => !q || f.name.toLowerCase().includes(q));
   }, [flavors, filter, showRetired]);
 
-  async function save(patch: Record<string, unknown>): Promise<boolean> {
+  async function save(patch: Record<string, unknown>): Promise<Flavor | null> {
+    if (inFlightRef.current) return null;
+    inFlightRef.current = true;
     setError("");
+    setBusy(true);
     try {
       const res = await fetch("/api/admin/flavors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return null;
+      }
+      const json = (await res.json().catch(() => ({}))) as { error?: string; flavor?: Flavor };
       if (!res.ok) {
         setError(json.error ?? "That didn't save — try again.");
-        return false;
+        return null;
       }
+      dirtyRef.current = false;
       startTransition(() => router.refresh());
-      return true;
+      return json.flavor ?? null;
     } catch {
       setError("That didn't save — check the connection and try again.");
-      return false;
+      return null;
+    } finally {
+      inFlightRef.current = false;
+      setBusy(false);
+    }
+  }
+
+  function toggleOpen(id: string) {
+    if (openId === id) {
+      // A stray thumb must not eat ten minutes of typing.
+      if (dirtyRef.current && !window.confirm("Close without saving your changes?")) return;
+      dirtyRef.current = false;
+      setOpenId(null);
+    } else {
+      if (openId && dirtyRef.current && !window.confirm("Close without saving your changes?")) return;
+      dirtyRef.current = false;
+      setOpenId(id);
+    }
+  }
+
+  async function createFlavor() {
+    const name = newName.trim();
+    if (!name || working) return;
+    const created = await save({ name, category: newCategory });
+    if (created) {
+      setNewName("");
+      setOpenId(created.id);
     }
   }
 
   return (
-    <div aria-busy={pending}>
+    <div aria-busy={working}>
+      {/* Create here, not just from the case — no shop's board required. */}
+      <div className="card mt-5 p-4">
+        <label htmlFor="lib-new" className="block text-sm font-semibold">
+          New flavor
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <input
+            id="lib-new"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Lemon Poppyseed"
+            className="field max-w-xs"
+          />
+          <select
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value as CategoryKey)}
+            aria-label="Board"
+            className="field max-w-52"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          <button onClick={createFlavor} className="btn disabled:opacity-60" disabled={working || !newName.trim()}>
+            {working ? "Adding…" : "Add to the library"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-ink-soft">
+          It lands in the library only — put it in a case from The Case screen
+          when it&apos;s churned.
+        </p>
+      </div>
+
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <input
           value={filter}
@@ -103,7 +183,7 @@ export default function FlavorLibrary({ flavors }: Props) {
         {visible.map((f) => (
           <li key={f.id} className="card overflow-hidden">
             <button
-              onClick={() => setOpenId(openId === f.id ? null : f.id)}
+              onClick={() => toggleOpen(f.id)}
               aria-expanded={openId === f.id}
               className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left"
             >
@@ -123,9 +203,23 @@ export default function FlavorLibrary({ flavors }: Props) {
               </span>
               <span aria-hidden className="text-ink-soft">{openId === f.id ? "▴" : "▾"}</span>
             </button>
-            {openId === f.id ? <FlavorEditor flavor={f} save={save} pending={pending} /> : null}
+            {openId === f.id ? (
+              <FlavorEditor
+                flavor={f}
+                save={save}
+                setError={setError}
+                markDirty={() => (dirtyRef.current = true)}
+                working={working}
+              />
+            ) : null}
           </li>
         ))}
+        {visible.length === 0 ? (
+          <li className="card px-4 py-6 text-center text-sm text-ink-soft">
+            No flavor matches that
+            {!showRetired ? " — it might be retired; flip on “Show retired” above" : ""}.
+          </li>
+        ) : null}
       </ul>
     </div>
   );
@@ -134,11 +228,15 @@ export default function FlavorLibrary({ flavors }: Props) {
 function FlavorEditor({
   flavor,
   save,
-  pending,
+  setError,
+  markDirty,
+  working,
 }: {
   flavor: Flavor;
-  save: (patch: Record<string, unknown>) => Promise<boolean>;
-  pending: boolean;
+  save: (patch: Record<string, unknown>) => Promise<Flavor | null>;
+  setError: (e: string) => void;
+  markDirty: () => void;
+  working: boolean;
 }) {
   const [name, setName] = useState(flavor.name);
   const [description, setDescription] = useState(flavor.description);
@@ -148,17 +246,41 @@ function FlavorEditor({
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  function touch() {
+    markDirty();
+  }
+
   function toggleAllergen(a: Allergen) {
+    touch();
     setAllergens((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
   }
 
   function setSize(i: number, key: keyof Size, value: string) {
+    touch();
     setSizes((cur) => cur.map((s, j) => (j === i ? { ...s, [key]: value } : s)));
+  }
+
+  async function onSave() {
+    // A half-filled size row must not vanish silently on save.
+    const halfFilled = sizes.some((s) => (s.label.trim() === "") !== (s.price.trim() === ""));
+    if (halfFilled) {
+      setError("One of the size rows is missing its name or price — fill it in or clear both boxes.");
+      return;
+    }
+    await save({
+      id: flavor.id,
+      name,
+      description,
+      category,
+      allergens,
+      sizes: sizes.filter((s) => s.label.trim() && s.price.trim()),
+    });
   }
 
   async function onPhoto(file: File | undefined) {
     if (!file) return;
     setUploading(true);
+    setError("");
     try {
       const { data, contentType } = await resizeToJpeg(file);
       const res = await fetch("/api/admin/photo", {
@@ -166,10 +288,21 @@ function FlavorEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename: file.name, contentType, data }),
       });
-      const json = (await res.json().catch(() => ({}))) as { url?: string };
-      if (res.ok && json.url) {
-        await save({ id: flavor.id, photoUrl: json.url });
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
       }
+      const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !json.url) {
+        setError(json.error ?? "The photo didn't upload — try again.");
+        return;
+      }
+      const saved = await save({ id: flavor.id, photoUrl: json.url });
+      if (!saved) return; // save() already surfaced its error
+    } catch {
+      // A file the browser can't decode (HEIC on some browsers, a corrupt
+      // shot) rejects in resizeToJpeg — that must not fail silently.
+      setError("Couldn't read that photo — try a different one, or a screenshot of it.");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -181,13 +314,17 @@ function FlavorEditor({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-semibold">
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} className="field mt-1 font-normal" />
+          <input
+            value={name}
+            onChange={(e) => { touch(); setName(e.target.value); }}
+            className="field mt-1 font-normal"
+          />
         </label>
         <label className="block text-sm font-semibold">
           Board
           <select
             value={category}
-            onChange={(e) => setCategory(e.target.value as CategoryKey)}
+            onChange={(e) => { touch(); setCategory(e.target.value as CategoryKey); }}
             className="field mt-1 font-normal"
           >
             {CATEGORIES.map((c) => (
@@ -203,7 +340,7 @@ function FlavorEditor({
         The story <span className="font-normal text-ink-soft">(shows on the website)</span>
         <textarea
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => { touch(); setDescription(e.target.value); }}
           rows={2}
           className="field mt-1 font-normal"
           placeholder="Made with the famous nuts from Cascarelli's of Homer."
@@ -250,7 +387,7 @@ function FlavorEditor({
           ))}
           <button
             type="button"
-            onClick={() => setSizes((cur) => [...cur, { label: "", price: "" }])}
+            onClick={() => { touch(); setSizes((cur) => [...cur, { label: "", price: "" }]); }}
             className="btn-ghost"
           >
             Another size
@@ -267,22 +404,16 @@ function FlavorEditor({
             accept="image/*"
             className="sr-only"
             onChange={(e) => onPhoto(e.target.files?.[0])}
-            disabled={uploading}
+            disabled={uploading || working}
           />
         </label>
-        <button
-          onClick={() =>
-            save({ id: flavor.id, name, description, category, allergens, sizes: sizes.filter((s) => s.label && s.price) })
-          }
-          className="btn"
-          disabled={pending}
-        >
-          Save
+        <button onClick={onSave} className="btn disabled:opacity-60" disabled={working}>
+          {working ? "Saving…" : "Save"}
         </button>
         <button
           onClick={() => save({ id: flavor.id, retired: !flavor.retired })}
           className="min-h-12 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline"
-          disabled={pending}
+          disabled={working}
         >
           {flavor.retired ? "Bring it back" : "Retire it"}
         </button>

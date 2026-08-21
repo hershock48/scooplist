@@ -10,10 +10,10 @@ export const metadata = { title: "Sign in" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bad?: string }>;
+  searchParams: Promise<{ bad?: string; locked?: string }>;
 }) {
   if (await isAuthed()) redirect("/case");
-  const { bad } = await searchParams;
+  const { bad, locked } = await searchParams;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
@@ -32,7 +32,12 @@ export default async function LoginPage({
           className="field text-center text-2xl tracking-[0.5em]"
           aria-label="Shop PIN"
         />
-        {bad ? (
+        {locked ? (
+          <p role="alert" className="mt-3 text-sm font-medium text-berry">
+            Too many tries. Give it ten minutes, then ask whoever runs the shop
+            for the PIN.
+          </p>
+        ) : bad ? (
           <p role="alert" className="mt-3 text-sm font-medium text-berry">
             That PIN didn&apos;t match. Ask whoever runs the shop.
           </p>

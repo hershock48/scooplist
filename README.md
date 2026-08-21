@@ -50,8 +50,12 @@ authority on the real configuration.
   blown keg rather than erasing it.
 - **PIN auth, 30-day cookie** (devine's gate-not-a-vault, lengthened: this
   lives on the owner's phone, not a shared screen, and daily re-auth is how
-  boards go stale). Nothing behind it moves money. If billing ever lands,
-  that goes behind a real login.
+  boards go stale). The cookie carries an HMAC of the PIN, never the PIN
+  (set `SCOOPLIST_SECRET` so cookie-guessing needs the server secret), and
+  failed PINs lock the address out for ten minutes after five misses —
+  per-instance on serverless, which is a documented limit, not an oversight.
+  Nothing behind the gate moves money. If billing ever lands, that goes
+  behind a real login.
 - **Photos: Vercel Blob when configured, inline data-URL otherwise.** Blob is
   one click in the dashboard and part of the hosting (same ruling as Neon —
   nothing rented). The browser downscales before upload so a 4MB camera shot

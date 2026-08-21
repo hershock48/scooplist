@@ -34,16 +34,29 @@ import type { CaseEntry, Flavor } from "@/lib/domain";
 type Store = {
   backend: "postgres" | "memory";
   listFlavors(): Promise<Flavor[]>;
+  /** Cheap emptiness probe — the seed check must not haul every jsonb row. */
+  hasAnyFlavors(): Promise<boolean>;
   getFlavor(id: string): Promise<Flavor | null>;
   upsertFlavor(f: Flavor): Promise<void>;
   /** Open entries for one shop, oldest first (the order the case was built). */
   listCase(locationId: string): Promise<CaseEntry[]>;
-  /** All entries for one shop, for history views later. */
+  /**
+   * IDEMPOTENT: a flavor already open at this shop is not added twice. The
+   * guard lives here (unique partial index / in-store check), not in the API
+   * route — a check-then-insert in the route is a race two double-tap POSTs
+   * will lose.
+   */
   addToCase(e: CaseEntry): Promise<void>;
   /** Close the OPEN entry for this flavor at this shop. No-op if none. */
   closeCaseEntry(locationId: string, flavorId: string, removedAt: number): Promise<void>;
   /** When anything about a shop's case last changed, for "updated x ago". */
   caseUpdatedAt(locationId: string): Promise<number | null>;
+  /**
+   * Run `fn` at most once across concurrent callers — the seed guard. On
+   * postgres this takes an advisory lock so two cold serverless instances
+   * cannot both seed a fresh database; in memory a memoized promise does it.
+   */
+  once(fn: () => Promise<void>): Promise<void>;
 };
 
 /* ------------------------------ memory ------------------------------ */
@@ -66,6 +79,9 @@ const memoryStore: Store = {
   async listFlavors() {
     return [...bag().flavors.values()].sort((a, b) => a.name.localeCompare(b.name));
   },
+  async hasAnyFlavors() {
+    return bag().flavors.size > 0;
+  },
   async getFlavor(id) {
     return bag().flavors.get(id) ?? null;
   },
@@ -78,7 +94,10 @@ const memoryStore: Store = {
       .sort((a, b) => a.addedAt - b.addedAt);
   },
   async addToCase(e) {
-    bag().entries.set(e.id, e);
+    const open = [...bag().entries.values()].some(
+      (x) => x.locationId === e.locationId && x.flavorId === e.flavorId && x.removedAt === null,
+    );
+    if (!open) bag().entries.set(e.id, e);
   },
   async closeCaseEntry(locationId, flavorId, removedAt) {
     for (const e of bag().entries.values()) {
@@ -95,6 +114,11 @@ const memoryStore: Store = {
       if (t === null || latest > t) t = latest;
     }
     return t;
+  },
+  async once(fn) {
+    const g = globalThis as typeof globalThis & { __scooplistOnce?: Promise<void> };
+    if (!g.__scooplistOnce) g.__scooplistOnce = fn();
+    await g.__scooplistOnce;
   },
 };
 
@@ -115,9 +139,11 @@ async function pgPool(): Promise<PgPool> {
     // actually configured (devine/pjs pattern, unchanged).
     const { Pool } = await import("pg");
     const cs = connectionString();
+    // Local hosts (any spelling) get no forced TLS; cloud Postgres requires it.
+    const local = /localhost|127\.0\.0\.1|\[::1\]/.test(cs ?? "") || cs?.includes("sslmode=disable");
     g.__scooplistPool = new Pool({
       connectionString: cs,
-      ssl: cs?.includes("localhost") ? undefined : { rejectUnauthorized: false },
+      ssl: local ? undefined : { rejectUnauthorized: false },
       max: 3,
     }) as unknown as PgPool;
     g.__scooplistReady = g.__scooplistPool.query(`
@@ -134,8 +160,10 @@ async function pgPool(): Promise<PgPool> {
         removed_at bigint,
         data jsonb NOT NULL
       );
-      CREATE INDEX IF NOT EXISTS scooplist_case_open
-        ON scooplist_case (location_id) WHERE removed_at IS NULL;
+      -- UNIQUE, deliberately: this is the "one open entry per flavor per
+      -- shop" invariant. addToCase leans on it via ON CONFLICT.
+      CREATE UNIQUE INDEX IF NOT EXISTS scooplist_case_open_uniq
+        ON scooplist_case (location_id, flavor_id) WHERE removed_at IS NULL;
     `);
   }
   await g.__scooplistReady;
@@ -148,6 +176,11 @@ const postgresStore: Store = {
     const pool = await pgPool();
     const r = await pool.query(`SELECT data FROM scooplist_flavors ORDER BY name ASC`);
     return r.rows.map((row) => row.data as Flavor);
+  },
+  async hasAnyFlavors() {
+    const pool = await pgPool();
+    const r = await pool.query(`SELECT 1 FROM scooplist_flavors LIMIT 1`);
+    return r.rows.length > 0;
   },
   async getFlavor(id) {
     const pool = await pgPool();
@@ -176,7 +209,8 @@ const postgresStore: Store = {
     const pool = await pgPool();
     await pool.query(
       `INSERT INTO scooplist_case (id, location_id, flavor_id, added_at, removed_at, data)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (location_id, flavor_id) WHERE removed_at IS NULL DO NOTHING`,
       [e.id, e.locationId, e.flavorId, e.addedAt, e.removedAt, JSON.stringify(e)],
     );
   },
@@ -197,6 +231,18 @@ const postgresStore: Store = {
     );
     const t = r.rows[0]?.t;
     return t == null ? null : Number(t);
+  },
+  async once(fn) {
+    // Advisory lock: two cold serverless instances hitting a fresh database
+    // serialize here, and the second one re-checks inside fn (seedIfEmpty
+    // re-probes) so it becomes a no-op instead of a double seed.
+    const pool = await pgPool();
+    await pool.query(`SELECT pg_advisory_lock(823542)`);
+    try {
+      await fn();
+    } finally {
+      await pool.query(`SELECT pg_advisory_unlock(823542)`);
+    }
   },
 };
 

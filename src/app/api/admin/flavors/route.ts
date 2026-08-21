@@ -46,6 +46,22 @@ export async function POST(request: Request) {
   const name = clean(b.name, 80) || existing?.name || "";
   if (!name) return NextResponse.json({ error: "The flavor needs a name." }, { status: 400 });
 
+  /*
+   * photoUrl is REJECTED over the cap, never truncated — a sliced data: URL
+   * saves "ok" and renders as a broken image everywhere. The cap clears the
+   * photo route's inline maximum (1.5M base64 + the data: prefix) with room.
+   */
+  let photoUrl = existing?.photoUrl ?? "";
+  if (b.photoUrl !== undefined) {
+    if (typeof b.photoUrl !== "string" || b.photoUrl.length > 2_000_000) {
+      return NextResponse.json(
+        { error: "That photo is too large to store — try uploading it again." },
+        { status: 413 },
+      );
+    }
+    photoUrl = b.photoUrl.trim();
+  }
+
   const category = (CATEGORIES.some((c) => c.key === b.category)
     ? (b.category as CategoryKey)
     : existing?.category) ?? "handscooped";
@@ -65,7 +81,7 @@ export async function POST(request: Request) {
     category,
     allergens,
     tags,
-    photoUrl: b.photoUrl !== undefined ? clean(b.photoUrl, 500_000) : existing?.photoUrl ?? "",
+    photoUrl,
     sizes: cleanSizes(b.sizes) ?? existing?.sizes ?? DEFAULT_SIZES[category],
     retired: typeof b.retired === "boolean" ? b.retired : existing?.retired ?? false,
     createdAt: existing?.createdAt ?? Date.now(),

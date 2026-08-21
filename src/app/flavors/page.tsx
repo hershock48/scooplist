@@ -44,8 +44,8 @@ export default async function FlavorsPage() {
       </p>
       {!blobConfigured ? (
         <p className="card mt-4 border-berry/40 bg-berry/5 px-4 py-3 text-sm font-medium text-berry">
-          Demo photo storage: photos are stored inline until a Blob store is
-          connected (one click in Vercel: Storage → Blob).
+          Demo mode for photos: they&apos;ll work, but ask your web person to
+          switch on photo storage before loading in the whole menu.
         </p>
       ) : null}
 
