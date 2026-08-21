@@ -1,12 +1,10 @@
 /**
- * The Scooplist mark v2 — built from the ACTUAL glazedweb logo
- * (glazedweb/public/brand/logo.svg), not the simplified favicon. The scoop
- * wears the donut icing's exact radial gradient (#F887B2 → #E84D8A →
- * #CE3672) and two-part sheen (fat white arc + dot); the melt borrows the
- * goo's full construction: dark back-drips for depth, three front drips
- * with rounded bulbs, a lighter creep band along the scoop's lower arc,
- * cream highlights down each drip, a droplet near the long drip's tip, and
- * the dark accent curve. Same layer order as the original.
+ * The Scooplist mark v3 — from Kevin's sketch (Aug 2026): big pink scoop
+ * with multicolored sprinkles, the GREEN goo from the glazedweb donut doing
+ * the melting (its exact gradients, back-drips, creep band, highlights,
+ * droplet, and dark accent — transplanted, not imitated), narrow brown cone
+ * underneath, drips hanging wider than the cone like the drawing. Pink and
+ * sheen are the logo's own.
  *
  * icon.svg is this exact artwork — keep them in sync. Gradient ids carry an
  * instance suffix so several marks can share one page.
@@ -22,6 +20,7 @@ export default function ScooplistMark({
   idSuffix?: string;
 }) {
   const id = (name: string) => `sp-${name}-${idSuffix}`;
+  const url = (name: string) => `url(#${id(name)})`;
   return (
     <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden className={className}>
       <defs>
@@ -30,74 +29,90 @@ export default function ScooplistMark({
           <stop offset="55%" stopColor="#E84D8A" />
           <stop offset="100%" stopColor="#CE3672" />
         </radialGradient>
-        <linearGradient id={id("drip")} x1="0" y1="31" x2="0" y2="59" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#F887B2" />
-          <stop offset="55%" stopColor="#E84D8A" />
-          <stop offset="100%" stopColor="#CE3672" />
+        <linearGradient id={id("goo")} x1="0" y1="30" x2="0" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#D9EDA0" />
+          <stop offset="55%" stopColor="#BFE07A" />
+          <stop offset="100%" stopColor="#A3CE55" />
         </linearGradient>
-        <linearGradient id={id("creep")} x1="0" y1="28" x2="0" y2="34" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FBAFCB" />
-          <stop offset="100%" stopColor="#F27BAB" />
+        <linearGradient id={id("creep")} x1="0" y1="26" x2="0" y2="33" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#E3F2B0" />
+          <stop offset="100%" stopColor="#C3E181" />
         </linearGradient>
-        <linearGradient id={id("dark")} x1="0" y1="31" x2="0" y2="48" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#C22F6B" />
-          <stop offset="100%" stopColor="#992052" />
+        <linearGradient id={id("dark")} x1="0" y1="30" x2="0" y2="48" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#5FA850" />
+          <stop offset="100%" stopColor="#43813A" />
         </linearGradient>
       </defs>
 
-      <path d="M 18 33 L 46 33 L 32 61 Z" fill="#B98A4A" />
+      <path d="M 23 32 L 41 32 L 32 61 Z" fill="#B98A4A" />
       <path
-        d="M 22 39 L 42 39 M 25 45 L 39 45 M 28 51 L 36 51 M 26 35 L 32 47 M 38 35 L 33 45"
+        d="M 26 38 L 38 38 M 28 45 L 36 45 M 30 52 L 34 52 M 27 34 L 32 48 M 37 34 L 32.5 46"
         stroke="#8a6536"
-        strokeWidth="1.8"
+        strokeWidth="1.6"
         fill="none"
       />
 
-      <g fill={`url(#${id("dark")})`}>
-        <ellipse cx="32" cy="35" rx="12.4" ry="4.9" />
-        <path d="M 27.4 31.8 C 27.4 37, 27.7 41.6, 28 45.5 C 28 47.5, 29 47.8, 29.4 45.5 C 29.7 41.6, 29.4 36.4, 29.4 31.8 Z" />
-        <path d="M 36.6 31.8 C 36.6 35.7, 36.9 39.6, 37.2 42.9 C 37.2 44.9, 38.2 45.2, 38.5 42.9 C 38.8 39.6, 38.5 35.1, 38.5 31.8 Z" />
+      <g fill={url("dark")}>
+        <ellipse cx="32" cy="33.5" rx="14.5" ry="4.6" />
+        <path d="M 26.5 30.5 C 26.5 35.5, 26.8 40, 27.1 43.7 C 27.1 45.7, 28.1 46, 28.5 43.7 C 28.8 40, 28.5 35, 28.5 30.5 Z" />
+        <path d="M 35.5 30.5 C 35.5 34.3, 35.8 38, 36.1 41.1 C 36.1 43.1, 37.1 43.4, 37.4 41.1 C 37.7 38, 37.4 33.7, 37.4 30.5 Z" />
       </g>
 
-      <g fill={`url(#${id("drip")})`}>
-        <path d="M 20.2 31.8 C 19.9 38.3, 20.5 44.2, 20.8 48.8 C 20.8 52.7, 21.5 55.4, 23.5 55.7 C 25.5 55.4, 26.4 53.1, 26.1 49.5 C 26.8 43.6, 27.1 37.1, 27.4 31.8 Z" />
-        <path d="M 29.4 31.8 C 29.1 40, 29.7 46.5, 30 51.8 C 30 55.8, 31 58.4, 33.2 58.7 C 35.4 58.4, 36.4 55.9, 35.8 52 C 36.1 45.5, 36.4 38.5, 36.6 31.8 Z" />
-        <path d="M 38.5 31.8 C 38.2 37, 38.5 41.6, 38.8 45.5 C 38.8 48.7, 39.5 51.1, 41.4 51.4 C 43 51.1, 44 49.1, 43.4 46.1 C 43.7 41.6, 44 36.4, 44.1 31.8 Z" />
+      <g fill={url("goo")}>
+        <path d="M 15.5 30.5 C 15.2 35, 15.8 39, 16 42.5 C 16 45.4, 16.8 47.4, 18.2 47.6 C 19.7 47.4, 20.4 45.6, 20 42.9 C 20.4 38.6, 20.4 34.5, 20.5 30.5 Z" />
+        <path d="M 21.5 30.5 C 21.2 36.5, 21.8 42, 22.1 46.5 C 22.1 50.2, 22.9 52.7, 24.2 53 C 25.6 52.7, 26.4 50.6, 26 47.3 C 26.4 41.7, 26.5 35.6, 26.5 30.5 Z" />
+        <path d="M 29 30.5 C 28.7 38.5, 29.3 45, 29.6 50.3 C 29.6 54.4, 30.6 57.5, 32.4 57.8 C 34.3 57.5, 35.2 54.7, 34.8 50.6 C 35.2 44, 35.4 37.2, 35.5 30.5 Z" />
+        <path d="M 37 30.5 C 36.8 35.3, 37.1 39.7, 37.4 43.4 C 37.4 46.4, 38.2 48.6, 39.6 48.9 C 41 48.6, 41.7 46.7, 41.3 43.9 C 41.6 39.7, 41.7 34.9, 41.5 30.5 Z" />
+        <path d="M 43.5 30.5 C 43.3 34, 43.6 37.4, 43.9 40.2 C 43.9 42.7, 44.6 44.5, 45.8 44.7 C 47 44.5, 47.7 42.9, 47.3 40.6 C 47.6 37.4, 47.7 33.7, 47.5 30.5 Z" />
       </g>
 
-      <circle cx="32" cy="22" r="17" fill={`url(#${id("pink")})`} />
+      <circle cx="32" cy="21" r="17.5" fill={url("pink")} />
 
       <path
-        d="M 17 30 A 17 17 0 0 0 47 30 C 46.3 28.7 45 28 43.7 28.7 C 42.4 29.6 42 31.2 40.7 31.9 C 38.7 32.5 37.7 29.9 35.7 29.3 C 33.7 28.6 33.4 31.2 31.7 32.2 C 30.1 32.8 29.1 30.6 27.1 29.6 C 25.1 28.9 24.5 30.6 22.9 31.2 C 21.2 31.5 19.9 30.6 17 30 Z"
-        fill={`url(#${id("creep")})`}
+        d="M 16.2 28.5 A 17.5 17.5 0 0 0 47.8 28.5 C 47.1 27.1 45.7 26.4 44.3 27.1 C 42.9 28.1 42.5 29.8 41.1 30.5 C 39 31.2 37.9 28.4 35.8 27.7 C 33.7 27 33.4 29.8 31.6 30.9 C 29.9 31.5 28.8 29.2 26.7 28.1 C 24.6 27.4 23.9 29.2 22.1 29.8 C 20.4 30.2 19 29.2 16.2 28.5 Z"
+        fill={url("creep")}
       />
       <path
-        d="M 21.5 33.8 A 13.7 13.7 0 0 0 26.8 37"
+        d="M 20.8 32.4 A 14 14 0 0 0 26.3 35.7"
         fill="none"
-        stroke="#FFE4EF"
+        stroke="#F1F8DC"
         strokeWidth="1.4"
         strokeLinecap="round"
         opacity="0.85"
       />
 
-      <path d="M 31 46 Q 33 48.3 35 46" fill="none" stroke="#C22F6B" strokeWidth="1.3" strokeLinecap="round" />
-
-      <g stroke="#FFE4EF" fill="none" strokeLinecap="round">
-        <path d="M 31 40.8 C 30.7 47.3, 31 53.2, 32 58" strokeWidth="1.5" opacity="0.85" />
-        <path d="M 21.8 37.5 C 21.5 42.1, 22.1 46.7, 22.4 50" strokeWidth="1.1" opacity="0.8" />
-        <path d="M 39.8 36.2 C 39.5 39.5, 40.2 44.1, 40.5 47.4" strokeWidth="1.1" opacity="0.8" />
+      <g strokeWidth="1.7" strokeLinecap="round" fill="none">
+        <path d="M 23.6 12.6 l 2.6 -1.5" stroke="#F5C84C" />
+        <path d="M 31 9.8 l 3 0.6" stroke="#6BC1E8" />
+        <path d="M 39.2 13.2 l 2.2 2" stroke="#FFF7E6" />
+        <path d="M 20.4 19.6 l 2.9 0.8" stroke="#A8E06B" />
+        <path d="M 28.2 16.9 l 2.4 -1.7" stroke="#F5934B" />
+        <path d="M 36.4 19.4 l 2.8 -1" stroke="#C79BE8" />
+        <path d="M 43.4 19.9 l 1.6 2.3" stroke="#F5C84C" />
+        <path d="M 25.4 24.4 l 2.8 1" stroke="#6BC1E8" />
+        <path d="M 33.4 23.9 l 2.7 -1.3" stroke="#FFF7E6" />
+        <path d="M 40.6 25.4 l 2.3 -1.8" stroke="#F5934B" />
       </g>
-      <circle cx="33.2" cy="56.4" r="0.8" fill="#FFE4EF" opacity="0.9" />
+
+      <path d="M 30.5 45.5 Q 32.4 47.7 34.3 45.4" fill="none" stroke="#55974A" strokeWidth="1.3" strokeLinecap="round" />
+
+      <g stroke="#F1F8DC" fill="none" strokeLinecap="round">
+        <path d="M 30.6 39.5 C 30.3 45.6, 30.6 51.2, 31.5 55.8" strokeWidth="1.4" opacity="0.85" />
+        <path d="M 22.8 36.2 C 22.5 40.5, 23.1 44.8, 23.4 48.2" strokeWidth="1.1" opacity="0.8" />
+        <path d="M 38.4 34.9 C 38.1 38, 38.7 42.1, 39 44.9" strokeWidth="1.1" opacity="0.8" />
+        <path d="M 16.9 34.2 C 16.7 37.3, 17.2 40.4, 17.5 43.3" strokeWidth="0.9" opacity="0.75" />
+      </g>
+      <circle cx="32.4" cy="55.6" r="0.8" fill="#F1F8DC" opacity="0.9" />
 
       <path
-        d="M 19.6 14.2 A 14.4 14.4 0 0 1 26.1 8.3"
+        d="M 19.4 12.4 A 14.8 14.8 0 0 1 26 6.4"
         fill="none"
         stroke="#FFFFFF"
         strokeWidth="2.6"
         strokeLinecap="round"
         opacity="0.75"
       />
-      <circle cx="29.4" cy="7.6" r="1.15" fill="#FFFFFF" opacity="0.75" />
+      <circle cx="29.4" cy="5.8" r="1.15" fill="#FFFFFF" opacity="0.75" />
     </svg>
   );
 }
