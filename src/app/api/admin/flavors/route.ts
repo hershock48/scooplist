@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
 import { newId, type Allergen, type CategoryKey, type Flavor, type Size } from "@/lib/domain";
-import { allergens as configuredAllergens, categories, defaultSizesFor } from "@/lib/vertical";
+import { resolveVertical, sizesForCategory } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -75,13 +75,14 @@ export async function POST(request: Request) {
   }
 
   // Validated against the CONFIGURED vertical, not a hardcoded ice cream
-  // list; the deployment's env decides what a legal category or allergen is.
-  const cats = categories();
+  // list; the deployment's config decides what a legal category or allergen is.
+  const v = await resolveVertical();
+  const cats = v.categories;
   const category = (cats.some((c) => c.key === b.category)
     ? (b.category as CategoryKey)
     : existing?.category) ?? cats[0].key;
 
-  const legalAllergens = configuredAllergens();
+  const legalAllergens = v.allergens;
   const allergens = Array.isArray(b.allergens)
     ? (b.allergens.filter((a) => legalAllergens.includes(String(a))) as Allergen[])
     : existing?.allergens ?? [];
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
     producer: b.producer !== undefined ? clean(b.producer, 80) : existing?.producer ?? "",
     abv,
     photoUrl,
-    sizes: cleanSizes(b.sizes) ?? existing?.sizes ?? defaultSizesFor(category),
+    sizes: cleanSizes(b.sizes) ?? existing?.sizes ?? sizesForCategory(v, category),
     sizesByShop: cleanShopSizes(b.sizesByShop) ?? existing?.sizesByShop,
     retired: typeof b.retired === "boolean" ? b.retired : existing?.retired ?? false,
     /*

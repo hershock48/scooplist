@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { locationById } from "@/lib/locations";
 import { byCaseOrder, sizesFor, type CaseEntry, type Flavor } from "@/lib/domain";
-import { categories } from "@/lib/vertical";
+import { resolveVertical } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -71,7 +71,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ location: stri
     .map((entry) => ({ entry, flavor: byId.get(entry.flavorId) }))
     .filter((x): x is { entry: CaseEntry; flavor: Flavor } => Boolean(x.flavor && !x.flavor.retired));
 
-  const boards = categories()
+  const boards = (await resolveVertical()).categories
     .map((c) => ({
       key: c.key,
       label: c.label,

@@ -62,6 +62,13 @@ type Store = {
   /** When anything about a shop's case last changed, for "updated x ago". */
   caseUpdatedAt(locationId: string): Promise<number | null>;
   /**
+   * Deployment settings the APP owns (the setup page's vertical choice),
+   * one jsonb value per key. Env vars stay the operator override on top;
+   * vertical.ts is the only reader and owns the precedence.
+   */
+  getSetting<T>(key: string): Promise<T | null>;
+  setSetting(key: string, value: unknown): Promise<void>;
+  /**
    * Run `fn` at most once across concurrent callers, the seed guard. On
    * postgres this takes an advisory lock so two cold serverless instances
    * cannot both seed a fresh database; in memory a memoized promise does it.
@@ -74,13 +81,16 @@ type Store = {
 type Bag = {
   flavors: Map<string, Flavor>;
   entries: Map<string, CaseEntry>;
+  settings: Map<string, unknown>;
 };
 
 function bag(): Bag {
   const g = globalThis as typeof globalThis & { __scooplist?: Bag };
   if (!g.__scooplist) {
-    g.__scooplist = { flavors: new Map(), entries: new Map() };
+    g.__scooplist = { flavors: new Map(), entries: new Map(), settings: new Map() };
   }
+  // Bags created before settings existed (hot reload across versions).
+  if (!g.__scooplist.settings) g.__scooplist.settings = new Map();
   return g.__scooplist;
 }
 
@@ -143,10 +153,28 @@ const memoryStore: Store = {
     }
     return t;
   },
+  async getSetting(key) {
+    return (bag().settings.get(key) as never) ?? null;
+  },
+  async setSetting(key, value) {
+    bag().settings.set(key, value);
+  },
   async once(fn) {
+    /*
+      SERIALIZE, don't memoize-forever: this used to cache the first
+      promise and skip every later fn, which was fine when seeding was a
+      one-shot, and wrong the day /setup let the config change mid-process
+      (choose tavern, then scoops: the scoops seed silently never ran,
+      observed). The postgres twin is an advisory lock, i.e. mutual
+      exclusion with re-entry; the "at most once" outcome comes from fn's
+      own re-check inside, on both backends.
+    */
     const g = globalThis as typeof globalThis & { __scooplistOnce?: Promise<void> };
-    if (!g.__scooplistOnce) g.__scooplistOnce = fn();
-    await g.__scooplistOnce;
+    const run = (g.__scooplistOnce ?? Promise.resolve()).then(fn);
+    // Keep the chain alive even if fn rejects, or every later once() would
+    // re-reject with a stale error.
+    g.__scooplistOnce = run.catch(() => {});
+    await run;
   },
 };
 
@@ -218,6 +246,10 @@ async function pgPool(): Promise<PgPool> {
       -- shop" invariant. addToCase leans on it via ON CONFLICT.
       CREATE UNIQUE INDEX IF NOT EXISTS scooplist_case_open_uniq
         ON scooplist_case (location_id, flavor_id) WHERE removed_at IS NULL;
+      CREATE TABLE IF NOT EXISTS scooplist_settings (
+        key text PRIMARY KEY,
+        data jsonb NOT NULL
+      );
     `);
   }
   await g.__scooplistReady;
@@ -330,6 +362,19 @@ const postgresStore: Store = {
     );
     const t = r.rows[0]?.t;
     return t == null ? null : Number(t);
+  },
+  async getSetting(key) {
+    const pool = await pgPool();
+    const r = await pool.query(`SELECT data FROM scooplist_settings WHERE key = $1`, [key]);
+    return (r.rows[0]?.data as never) ?? null;
+  },
+  async setSetting(key, value) {
+    const pool = await pgPool();
+    await pool.query(
+      `INSERT INTO scooplist_settings (key, data) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET data = $2`,
+      [key, JSON.stringify(value)],
+    );
   },
   async once(fn) {
     // Advisory lock: two cold serverless instances hitting a fresh database

@@ -1,19 +1,32 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import CaseBoard from "@/components/CaseBoard";
 import AppHeader from "@/components/AppHeader";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
-import { categories, exampleItem, voice } from "@/lib/vertical";
+import { resolveVertical } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
 import type { CaseStatus } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: voice() === "neutral" ? "The board" : "The case" };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const v = await resolveVertical();
+  return { title: `The ${v.nouns.surface}` };
+}
 
 export default async function CasePage() {
   if (!(await isAuthed())) redirect("/login");
+
+  /*
+    First run on a fresh, unconfigured install: before anything else, ask
+    what kind of business this is. resolveVertical only flags this when
+    nothing configured the vertical AND the library is empty, so existing
+    installs (env-pinned, or full of flavors) never see it.
+  */
+  const v = await resolveVertical();
+  if (v.setupPending) redirect("/setup");
 
   await seedIfEmpty();
   const store = getStore();
@@ -34,7 +47,12 @@ export default async function CasePage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-28 pt-6">
-      <AppHeader current="case" boardHref={`/board/${shops[0]?.id ?? ""}`} voice={voice()} />
+      <AppHeader
+        current="case"
+        boardHref={`/board/${shops[0]?.id ?? ""}`}
+        voice={v.voice}
+        nouns={v.nouns}
+      />
 
       {/* Shop voice out front; the Vercel specifics live in the README for
           the person who can actually act on them. */}
@@ -47,10 +65,11 @@ export default async function CasePage() {
 
       <CaseBoard
         shops={shops}
-        categories={categories()}
+        categories={v.categories}
         flavors={flavors}
-        example={exampleItem()}
-        voice={voice()}
+        example={v.example}
+        voice={v.voice}
+        nouns={v.nouns}
         caseByShop={caseByShop}
       />
     </main>

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { newId, type Allergen, type CategoryKey, type Flavor } from "@/lib/domain";
-import { categories, defaultSizesFor } from "@/lib/vertical";
+import { resolveVertical, sizesForCategory, type ResolvedVertical } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 import { locations } from "@/lib/locations";
 import { BAR_SEED, BAR_SEED_KEYS } from "@/lib/seed-bar";
@@ -68,6 +68,18 @@ const SEED: SeedRow[] = [
   ["Strawberry Lemonade Sorbet", "dairyfree"],
 ];
 
+/**
+ * Forget this process's "already decided about seeding" flag. The setup
+ * route calls it when the vertical changes: the decision was made against
+ * the OLD config (a tavern that seeds nothing, say), and the new one
+ * (scoops) deserves a fresh look. Without this, choosing scoops after
+ * tavern on one warm instance silently skipped the ice cream seed.
+ */
+export function resetSeedGuard(): void {
+  const g = globalThis as typeof globalThis & { __scooplistSeeded?: boolean };
+  g.__scooplistSeeded = false;
+}
+
 export async function seedIfEmpty(): Promise<void> {
   /*
     Three layers, cheapest first: a per-process flag (free after the first
@@ -80,17 +92,30 @@ export async function seedIfEmpty(): Promise<void> {
 
   /*
     Which vertical's demo data fits this deployment:
-    - Default (no custom categories): True North's ICE CREAM board.
-    - Categories covering the full tavern contract: Cascarelli's BAR
-      program (seed-bar.ts) - same precedent, the first client of the
-      vertical is its demo data.
-    - Any other custom categories: start empty. Rows whose categories
-      match none of the boards would be invisible on every screen and
-      still pollute the library and the picker.
+    - SETUP PENDING (nothing configured it and the library is empty):
+      seed NOTHING. This is the whole point of the setup page: the boot
+      used to fill an unconfigured install with ice cream before the
+      owner could say what the business is, which meant the "what kind of
+      business is this?" step could never appear. The choice on /setup
+      saves the config and THEN calls back here.
+    - Scoops (chosen or default-with-data): True North's ICE CREAM board.
+    - Categories covering the FULL bar contract (BAR_SEED_KEYS, which is
+      Cascarelli's real ten-board program): the bar seed. Note this is
+      deliberately NOT "the tavern preset": the preset's generic three
+      boards (taps/cans/na) cover a tenth of the bar program, and seeding
+      rows into boards that do not exist would make them invisible
+      everywhere while still polluting the library.
+    - Anything else (tavern preset, coffee, other, unrecognized env
+      categories): start empty.
   */
-  let seedFn: (() => Promise<void>) | null = seed;
-  if (process.env.SCOOPLIST_CATEGORIES) {
-    const keys = new Set(categories().map((c) => c.key));
+  const v = await resolveVertical();
+  if (v.setupPending) return; // NOT marked seeded: setup will call again.
+
+  let seedFn: (() => Promise<void>) | null = null;
+  if (v.preset === "scoops") {
+    seedFn = () => seed(v);
+  } else {
+    const keys = new Set(v.categories.map((c) => c.key));
     seedFn = BAR_SEED_KEYS.every((k) => keys.has(k)) ? seedBar : null;
   }
   if (!seedFn) {
@@ -154,7 +179,7 @@ async function seedBar(): Promise<void> {
   }
 }
 
-async function seed(): Promise<void> {
+async function seed(v: ResolvedVertical): Promise<void> {
   const store = getStore();
   const now = Date.now();
   const shops = locations();
@@ -170,7 +195,7 @@ async function seed(): Promise<void> {
       tags: category === "dairyfree" ? ["dairy free"] : [],
       producer: producer ?? "",
       photoUrl: "",
-      sizes: defaultSizesFor(category),
+      sizes: sizesForCategory(v, category),
       retired: false,
       createdAt: now,
     };

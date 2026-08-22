@@ -30,6 +30,16 @@ authority on the real configuration.
 
 ## Surfaces
 
+- `/setup`, PIN-gated: "what kind of business is this?" A fresh,
+  unconfigured install lands here first (the admin pages redirect while
+  the choice is pending); the presets (`src/lib/presets.ts`) set the
+  boards, default prices, allergen chips, demo data, and the app's own
+  words (flavor/case, drink/cooler…), stored in `scooplist_settings`.
+  Editable later from the menu ("Business type"). Env vars stay the
+  operator override: `SCOOPLIST_CATEGORIES` pins a deployment entirely
+  (the setup screen turns read-only), which is how the live installs
+  stay exactly as deployed. "Something else" takes free-text nouns and a
+  first board name.
 - `/case`, the owner's screen, PIN-gated, phone-first. Shop tabs, the case
   grouped by board, two-tap out, picker-with-inline-new for in, per-board
   reorder (arrows, not drag: drag fights the swipe gesture and arrows work

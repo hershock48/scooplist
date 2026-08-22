@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import ScooplistMark from "@/components/Logo";
+import type { VerticalNouns } from "@/lib/presets";
 
 /**
  * The signed-in header.
@@ -23,11 +24,14 @@ export default function AppHeader({
   current,
   boardHref,
   voice = "scoops",
+  nouns,
 }: {
-  current: "case" | "library" | "history";
+  current: "case" | "library" | "history" | "setup";
   boardHref: string;
-  /** Copy voice (vertical.ts voice()): "The case" is scoop vocabulary. */
+  /** Copy voice (vertical.ts): "The case" is scoop vocabulary. */
   voice?: "scoops" | "neutral";
+  /** The vertical's own words (presets.ts): case, cooler, board. */
+  nouns?: VerticalNouns;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -46,17 +50,20 @@ export default function AppHeader({
     };
   }, [open]);
 
+  const surface = nouns?.surface ?? (voice === "neutral" ? "board" : "case");
   const items: Item[] = [
-    { href: "/case", label: voice === "neutral" ? "The board" : "The case" },
+    { href: "/case", label: `The ${surface}` },
     { href: "/flavors", label: "Library" },
     { href: "/history", label: "History" },
+    { href: "/setup", label: "Business type" },
     { href: boardHref, label: "TV board ↗", external: true },
   ];
 
   const isCurrent = (href: string) =>
     (current === "case" && href === "/case") ||
     (current === "library" && href === "/flavors") ||
-    (current === "history" && href === "/history");
+    (current === "history" && href === "/history") ||
+    (current === "setup" && href === "/setup");
 
   const signOut = (
     <form method="post" action="/api/logout">

@@ -1,94 +1,73 @@
+import "server-only";
+
 import type { Size } from "@/lib/domain";
+import {
+  NEUTRAL_NOUNS,
+  PRESETS,
+  presetByKey,
+  type Category,
+  type PresetKey,
+  type VerticalConfig,
+  type VerticalNouns,
+} from "@/lib/presets";
+import { getStore } from "@/lib/store";
+
+export type { Category, VerticalConfig, VerticalNouns } from "@/lib/presets";
 
 /**
- * THE VERTICAL: what kind of things this deployment lists.
+ * THE VERTICAL: what kind of things this deployment lists, resolved from
+ * three layers, strongest first:
  *
- * Scooplist shipped with ice cream frozen into domain.ts, and the first
- * question a second vertical asked (Cascarelli's tavern, twenty taps) was
- * "why is Soft Serve in my beer app?" locations.ts had already solved this
- * exact problem for shops, read the env, default to True North, so this
- * file does the same thing one concept over: categories, allergens, and
- * the default size/price lists are a dashboard edit, not a fork.
+ *   1. ENV      the operator override (us, in the Vercel dashboard). If
+ *               SCOOPLIST_CATEGORIES is set the whole vertical is
+ *               env-defined and the setup page never argues. This is how
+ *               the live True North and Cascarelli's installs stay pinned
+ *               (Kevin's ruling: existing installs do not migrate).
+ *               Single-field vars (EXAMPLE, ALLERGENS, SIZES, NOUNS) also
+ *               override individual fields of a stored config.
+ *   2. STORE    what the owner chose on /setup, one jsonb row the app
+ *               owns. This is the product surface; env vars are not.
+ *   3. PRESET   the scoops defaults, byte-for-byte the values that used
+ *               to be hardcoded, so an unconfigured deployment behaves
+ *               exactly as it always has.
  *
- * Nothing set = exactly the ice cream values that used to be hardcoded, so
- * every existing deployment behaves identically until someone chooses
- * otherwise.
+ * setupPending is true only when nothing configured it AND the library is
+ * empty: a fresh install gets the "what kind of business is this?" step,
+ * while True North (unconfigured but full of flavors since before setup
+ * existed) never sees it.
  *
- *   SCOOPLIST_CATEGORIES   key:Label pairs, comma-separated.
- *                          taps:On Tap,cans:Cans & Bottles,na:Non-Alcoholic
- *   SCOOPLIST_ALLERGENS    plain comma list. For a bar, likely empty: set
- *                          it to "-" to mean "none" (an empty var means
- *                          "use the default", the locations.ts convention).
- *   SCOOPLIST_SIZES        default price lists per category key:
- *                          taps=Half:$4|Pint:$7|Flight:$12;cans=Can:$5
- *
- * SERVER-SIDE ONLY: pages and routes read these and hand them to the
- * client components as props. A client bundle only inlines NEXT_PUBLIC_
- * vars, so importing this from a "use client" file would silently give
- * every visitor the defaults.
+ * SERVER-SIDE ONLY (and now enforced with server-only: this file imports
+ * the store). Pages and routes resolve once and hand plain fields to the
+ * client components as props.
  */
 
-export type Category = { key: string; label: string };
-
-const DEFAULT_CATEGORIES: Category[] = [
-  { key: "handscooped", label: "Hand-Scooped" },
-  { key: "softserve", label: "Soft Serve" },
-  { key: "dairyfree", label: "Dairy Free & Sorbet" },
-  { key: "adult", label: "Adult Flavors (21+)" },
-];
-
-const DEFAULT_ALLERGENS = ["nuts", "gluten", "egg", "soy"];
-
-const DEFAULT_SIZES: Record<string, Size[]> = {
-  handscooped: [
-    { label: "Mini", price: "$4.75" },
-    { label: "Small", price: "$5.75" },
-    { label: "Large", price: "$6.75" },
-  ],
-  softserve: [
-    { label: "Mini", price: "$3.75" },
-    { label: "Small", price: "$4.75" },
-    { label: "Large", price: "$5.75" },
-  ],
-  dairyfree: [
-    { label: "Mini", price: "$4.75" },
-    { label: "Small", price: "$5.75" },
-    { label: "Large", price: "$6.75" },
-  ],
-  adult: [
-    { label: "Mini", price: "$5.75" },
-    { label: "Small", price: "$6.75" },
-    { label: "Large", price: "$7.75" },
-  ],
+export type ResolvedVertical = VerticalConfig & {
+  source: "env" | "store" | "default";
+  setupPending: boolean;
 };
 
-/**
- * The example name shown in "new item" placeholders. "Lemon Poppyseed" on a
- * BAR deployment was the first thing the owner noticed, so the example
- * follows the vertical like everything else here. Ice cream by default.
- *
- *   SCOOPLIST_EXAMPLE=Bell's Two Hearted
- */
-export function exampleItem(): string {
-  return process.env.SCOOPLIST_EXAMPLE?.trim() || "Lemon Poppyseed";
+const SETTING_KEY = "vertical";
+const CACHE_MS = 30_000;
+
+type Cache = { value: ResolvedVertical; at: number };
+
+function cacheBox(): { current: Cache | null } {
+  const g = globalThis as typeof globalThis & { __scooplistVertical?: { current: Cache | null } };
+  if (!g.__scooplistVertical) g.__scooplistVertical = { current: null };
+  return g.__scooplistVertical;
 }
 
-/**
- * Which copy voice the admin speaks. The action sheet said "Tub's empty"
- * over a bottle of Pinot Grigio on the tavern install, which is how this
- * earned its place next to exampleItem(): verbs are vertical too. A
- * deployment with its own categories gets neutral service-industry wording;
- * the default vertical keeps the scoop-shop charm. Client components get
- * this as a prop (a string flag, since functions cannot cross the
- * server-to-client boundary).
- */
-export function voice(): "scoops" | "neutral" {
-  return process.env.SCOOPLIST_CATEGORIES ? "neutral" : "scoops";
+/** Call after saving the setting so THIS instance re-reads immediately;
+    other warm instances catch up within CACHE_MS. */
+export function invalidateVertical(): void {
+  cacheBox().current = null;
 }
 
-export function categories(): Category[] {
+/* ------------------------------ env layer ------------------------------ */
+
+function envCategories(): Category[] | null {
   const raw = process.env.SCOOPLIST_CATEGORIES;
-  if (!raw) return DEFAULT_CATEGORIES;
+  if (!raw) return null;
   const parsed = raw
     .split(",")
     .map((pair) => {
@@ -96,16 +75,12 @@ export function categories(): Category[] {
       return { key: key.trim(), label: label.join(":").trim() || key.trim() };
     })
     .filter((c) => c.key);
-  return parsed.length > 0 ? parsed : DEFAULT_CATEGORIES;
+  return parsed.length > 0 ? parsed : null;
 }
 
-export function categoryByKey(key: string): Category | null {
-  return categories().find((c) => c.key === key) ?? null;
-}
-
-export function allergens(): string[] {
+function envAllergens(): string[] | null {
   const raw = process.env.SCOOPLIST_ALLERGENS;
-  if (!raw) return DEFAULT_ALLERGENS;
+  if (!raw) return null;
   // "-" = deliberately none; a bar has no allergen chips to offer.
   if (raw.trim() === "-") return [];
   return raw
@@ -115,27 +90,22 @@ export function allergens(): string[] {
 }
 
 /**
- * The starting price list for a category: env override, else ice cream.
- *
- * "-" means DELIBERATELY NONE, the allergens() convention: a bare
- * SCOOPLIST_SIZES=- gives every category no default prices, and a block
- * whose list is "-" (taps=-) does the same for that one category. Both
- * are checked BEFORE the pipe-parse on purpose, "-" parses to zero valid
- * sizes and would otherwise fall through to the ice cream list, which is
- * exactly the bug this mode exists to prevent (a 7% IPA priced
- * Mini/Small/Large, observed on the Cascarelli's test instance). A bar
- * with no size pricing sets "-" instead of inventing prices, and a
- * flavor that still needs one (a rare bottle) gets it per flavor in the
- * library.
+ * Per-category default sizes from SCOOPLIST_SIZES, "-" rules intact:
+ * a bare "-" is no defaults anywhere, "taps=-" none for that category,
+ * both checked BEFORE the pipe-parse ("-" parses to zero valid sizes and
+ * would otherwise fall through, the observed 7%-IPA-priced-Mini bug).
+ * Returns null when the var is unset, a full record otherwise.
  */
-export function defaultSizesFor(categoryKey: string): Size[] {
+function envSizes(categoryKeys: string[]): Record<string, Size[]> | null {
   const raw = process.env.SCOOPLIST_SIZES?.trim();
-  if (raw === "-") return [];
-  if (raw) {
+  if (!raw) return null;
+  const out: Record<string, Size[]> = {};
+  if (raw === "-") return out;
+  for (const key of categoryKeys) {
     for (const block of raw.split(";")) {
-      const [key, list] = block.split("=");
-      if (key?.trim() !== categoryKey || list === undefined) continue;
-      if (list.trim() === "-") return [];
+      const [k, list] = block.split("=");
+      if (k?.trim() !== key || list === undefined) continue;
+      if (list.trim() === "-") break;
       const sizes = list
         .split("|")
         .map((pair) => {
@@ -143,17 +113,140 @@ export function defaultSizesFor(categoryKey: string): Size[] {
           return { label: label.trim(), price: price.join(":").trim() };
         })
         .filter((s) => s.label && s.price);
-      if (sizes.length > 0) return sizes;
+      if (sizes.length > 0) out[key] = sizes;
+      break;
     }
   }
-  /*
-    The ice cream lists are only a sensible default for the ice cream
-    vertical. A deployment that configured its own categories gets NO
-    guessed prices for a category it did not price, a placeholder-rule
-    call: silence beats an invented number that reads as real. (This is
-    also the belt to "-"'s suspenders: the observed bug happened on a bar
-    instance with SCOOPLIST_SIZES entirely unset.)
-  */
-  if (process.env.SCOOPLIST_CATEGORIES) return DEFAULT_SIZES[categoryKey] ?? [];
-  return DEFAULT_SIZES[categoryKey] ?? DEFAULT_SIZES.handscooped;
+  return out;
+}
+
+/** SCOOPLIST_NOUNS="drink,cooler,in": the env-pinned installs' way to get
+    preset-grade nouns (Cascarelli's cooler) without migrating to the store. */
+function envNouns(): VerticalNouns | null {
+  const raw = process.env.SCOOPLIST_NOUNS;
+  if (!raw) return null;
+  const [item, surface, prep] = raw.split(",").map((s) => s.trim().toLowerCase());
+  if (!item || !surface) return null;
+  return { item, surface, prep: prep === "in" ? "in" : "on" };
+}
+
+/* ----------------------------- resolution ------------------------------ */
+
+const SCOOPS = PRESETS.find((p) => p.key === "scoops")!;
+
+function scoopsDefault(): VerticalConfig {
+  return {
+    preset: "scoops",
+    categories: SCOOPS.categories,
+    allergens: SCOOPS.allergens,
+    sizes: SCOOPS.sizes,
+    example: SCOOPS.example,
+    voice: SCOOPS.voice,
+    nouns: SCOOPS.nouns,
+  };
+}
+
+/** A stored value is data from a database, so it is validated, not trusted:
+    a half-shaped row degrades to the scoops defaults rather than crashing
+    every page that renders from it. */
+function validStored(v: unknown): VerticalConfig | null {
+  if (!v || typeof v !== "object") return null;
+  const c = v as Partial<VerticalConfig>;
+  if (!Array.isArray(c.categories) || c.categories.length === 0) return null;
+  if (!c.nouns?.item || !c.nouns?.surface) return null;
+  return {
+    preset: (presetByKey(String(c.preset)) ? c.preset : "other") as PresetKey,
+    categories: c.categories.filter((x) => x?.key).map((x) => ({ key: String(x.key), label: String(x.label ?? x.key) })),
+    allergens: Array.isArray(c.allergens) ? c.allergens.map(String) : [],
+    sizes: c.sizes && typeof c.sizes === "object" ? (c.sizes as Record<string, Size[]>) : {},
+    example: String(c.example ?? "").trim() || "The Special",
+    voice: c.voice === "scoops" ? "scoops" : "neutral",
+    nouns: {
+      item: String(c.nouns.item),
+      surface: String(c.nouns.surface),
+      prep: c.nouns.prep === "in" ? "in" : "on",
+    },
+  };
+}
+
+export async function resolveVertical(): Promise<ResolvedVertical> {
+  const box = cacheBox();
+  if (box.current && Date.now() - box.current.at < CACHE_MS) return box.current.value;
+
+  let value: ResolvedVertical;
+
+  const envCats = envCategories();
+  if (envCats) {
+    // Fully env-defined: the pinned installs. Neutral voice, neutral nouns
+    // unless SCOOPLIST_NOUNS says otherwise.
+    const keys = envCats.map((c) => c.key);
+    value = {
+      preset: "other",
+      categories: envCats,
+      allergens: envAllergens() ?? [],
+      sizes: envSizes(keys) ?? {},
+      example: process.env.SCOOPLIST_EXAMPLE?.trim() || "The Special",
+      voice: "neutral",
+      nouns: envNouns() ?? NEUTRAL_NOUNS,
+      source: "env",
+      setupPending: false,
+    };
+  } else {
+    // A database blip must not take down every page that asks what kind of
+    // business this is: the TV board's whole failure design is "degrade
+    // calmly", and this resolver runs before its try/catch. No store =
+    // scoops defaults, setup not pending (a broken store is not a fresh
+    // install), and the short cache means we re-ask soon.
+    const store = getStore();
+    let stored: VerticalConfig | null = null;
+    let storeDown = false;
+    try {
+      stored = validStored(await store.getSetting(SETTING_KEY));
+    } catch {
+      storeDown = true;
+    }
+    if (stored) {
+      // Single-field env vars still override a stored config, so we can
+      // adjust one thing from the dashboard without retiring the setup.
+      value = {
+        ...stored,
+        allergens: envAllergens() ?? stored.allergens,
+        sizes: envSizes(stored.categories.map((c) => c.key)) ?? stored.sizes,
+        example: process.env.SCOOPLIST_EXAMPLE?.trim() || stored.example,
+        nouns: envNouns() ?? stored.nouns,
+        source: "store",
+        setupPending: false,
+      };
+    } else {
+      const base = scoopsDefault();
+      value = {
+        ...base,
+        allergens: envAllergens() ?? base.allergens,
+        sizes: envSizes(base.categories.map((c) => c.key)) ?? base.sizes,
+        example: process.env.SCOOPLIST_EXAMPLE?.trim() || base.example,
+        nouns: envNouns() ?? base.nouns,
+        source: "default",
+        // Setup only greets an EMPTY install: True North predates setup,
+        // is unconfigured, and must never be ambushed by it. A store that
+        // cannot be asked counts as "not empty" for the same reason.
+        setupPending: storeDown ? false : !(await store.hasAnyFlavors().catch(() => true)),
+      };
+    }
+  }
+
+  box.current = { value, at: Date.now() };
+  return value;
+}
+
+/**
+ * The starting price list for a category under this config. The scoops
+ * preset keeps its old lenient fallback (an unknown key prices like
+ * hand-scooped, the original behavior); every other vertical gets NO
+ * guessed prices for a category nobody priced, the placeholder rule.
+ */
+export function sizesForCategory(v: VerticalConfig, categoryKey: string): Size[] {
+  const hit = v.sizes[categoryKey];
+  if (hit && hit.length > 0) return hit;
+  if (v.preset === "scoops") return v.sizes.handscooped ?? [];
+  return [];
 }

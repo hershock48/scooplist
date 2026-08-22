@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import SwipeCard from "@/components/SwipeCard";
 import { byCaseOrder, type CaseStatus, type CategoryKey, type Flavor } from "@/lib/domain";
-import type { Category } from "@/lib/vertical";
+import type { Category, VerticalNouns } from "@/lib/presets";
 import type { ShopLocation } from "@/lib/locations";
 
 /**
@@ -42,35 +42,72 @@ type Props = {
   shops: ShopLocation[];
   categories: Category[];
   flavors: Flavor[];
-  /** Vertical-appropriate placeholder name (vertical.ts exampleItem). */
+  /** Vertical-appropriate placeholder name (vertical.ts). */
   example: string;
-  /** Copy voice (vertical.ts voice()): scoop-shop charm or neutral verbs. */
+  /** Copy voice (vertical.ts): scoop-shop charm or neutral verbs. */
   voice: "scoops" | "neutral";
+  /** The vertical's own words (presets.ts): flavor/case, drink/cooler… */
+  nouns: VerticalNouns;
   caseByShop: Record<string, CaseEntryLite[]>;
 };
 
-/** The verbs that turned out to be vertical: "Tub's empty" over a bottle of
-    Pinot Grigio was the tavern owner's first question. */
-const COPY = {
-  scoops: {
-    noun: "flavor",
-    out: "Tub's empty, take it off the board",
-    start: "Start scooping it",
-    ondeck: "Move to on deck",
-    inCase: (shop: string) => `In the ${shop} case.`,
-    low: (shop: string) => `Running low in the ${shop} case.`,
-    newInto: (shop: string) => `New flavor, into the ${shop} case`,
-  },
-  neutral: {
-    noun: "item",
-    out: "86 it, take it off the board",
-    start: "Put it back on the board",
+type Copy = {
+  noun: string;
+  out: string;
+  start: string;
+  ondeck: string;
+  addIt: string;
+  inCase: (shop: string) => string;
+  low: (shop: string) => string;
+  newInto: (shop: string) => string;
+  empty: (shop: string) => string;
+  count: (n: number) => string;
+  offBoard: (shop: string) => string;
+  confirmTitle: (name: string, shop: string) => string;
+};
+
+/**
+ * The verbs that turned out to be vertical: "Tub's empty" over a bottle of
+ * Pinot Grigio was the tavern owner's first question. The scoop voice is
+ * LITERAL strings, unchanged character for character since the True North
+ * build; the neutral voice composes around the preset's nouns, minding the
+ * grammar the nouns bring with them (things come OUT OF a cooler but OFF
+ * a board, so the preposition travels with the noun).
+ */
+const SCOOP_COPY: Copy = {
+  noun: "flavor",
+  out: "Tub's empty, take it off the board",
+  start: "Start scooping it",
+  ondeck: "Move to on deck",
+  addIt: "Add it to the case",
+  inCase: (shop) => `In the ${shop} case.`,
+  low: (shop) => `Running low in the ${shop} case.`,
+  newInto: (shop) => `New flavor, into the ${shop} case`,
+  empty: (shop) => `Nothing in the ${shop} case yet.`,
+  count: (n) => `${n} in the case`,
+  offBoard: (shop) => `is off the ${shop} board.`,
+  confirmTitle: (name, shop) => `Take ${name} off the ${shop} board?`,
+};
+
+function neutralCopy(n: VerticalNouns): Copy {
+  const outOf = n.prep === "in" ? "out of" : "off";
+  const into = n.prep === "in" ? "into" : "onto";
+  const prepCap = n.prep === "in" ? "In" : "On";
+  return {
+    noun: n.item,
+    out: `86 it, take it ${outOf} the ${n.surface}`,
+    start: `Put it back ${n.prep} the ${n.surface}`,
     ondeck: "On deck, it goes on next",
-    inCase: (shop: string) => `On the ${shop} board.`,
-    low: (shop: string) => `Running low at ${shop}, last call.`,
-    newInto: (shop: string) => `New item, onto the ${shop} board`,
-  },
-} as const;
+    addIt: `Add it to the ${n.surface}`,
+    inCase: (shop) => `${prepCap} the ${shop} ${n.surface}.`,
+    low: (shop) => `Running low at ${shop}, last call.`,
+    newInto: (shop) => `New ${n.item}, ${into} the ${shop} ${n.surface}`,
+    empty: (shop) => `Nothing ${n.prep} the ${shop} ${n.surface} yet.`,
+    count: (count) => `${count} ${n.prep} the ${n.surface}`,
+    offBoard: (shop) => `is ${outOf} the ${shop} ${n.surface}.`,
+    confirmTitle: (name, shop) => `Take ${name} ${outOf} the ${shop} ${n.surface}?`,
+  };
+}
 
 type Sheet =
   | { kind: "flavor"; flavor: Flavor }
@@ -79,8 +116,8 @@ type Sheet =
   | { kind: "new"; category?: CategoryKey }
   | null;
 
-export default function CaseBoard({ shops, categories, flavors, example, voice, caseByShop }: Props) {
-  const copy = COPY[voice];
+export default function CaseBoard({ shops, categories, flavors, example, voice, nouns, caseByShop }: Props) {
+  const copy = voice === "scoops" ? SCOOP_COPY : neutralCopy(nouns);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -322,7 +359,7 @@ export default function CaseBoard({ shops, categories, flavors, example, voice, 
       ) : (
         <div className="card mt-5 px-5 py-6 text-center">
           <p className="font-[family-name:var(--font-display)] text-xl font-semibold">
-            Nothing in the {shopName} case yet.
+            {copy.empty(shopName)}
           </p>
           <p className="mt-1 text-sm text-ink-soft">
             Use a <b>+</b> below to fill a board.
@@ -336,7 +373,7 @@ export default function CaseBoard({ shops, categories, flavors, example, voice, 
             <h2 id={`case-${b.key}`} className="font-[family-name:var(--font-display)] text-xl font-semibold">
               {b.label}
               <span className="ml-2 text-sm font-normal text-ink-soft">
-                {b.flavors.length ? `${b.flavors.length} in the case` : "empty"}
+                {b.flavors.length ? copy.count(b.flavors.length) : "empty"}
               </span>
             </h2>
             <div className="flex shrink-0 items-center gap-2">
@@ -487,7 +524,7 @@ export default function CaseBoard({ shops, categories, flavors, example, voice, 
         >
           <div className="mx-auto flex max-w-3xl items-center gap-3 rounded-full bg-ink px-4 py-2.5 text-cream shadow-lg">
             <span className="flex-1 text-sm font-medium">
-              <b>{pulled.name}</b> is off the {shopName} board.
+              <b>{pulled.name}</b> {copy.offBoard(shopName)}
             </span>
             <button
               onClick={() => {
@@ -561,7 +598,7 @@ export default function CaseBoard({ shops, categories, flavors, example, voice, 
             {sheet.kind === "confirm" ? (
               <>
                 <h3 className="-mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold">
-                  Take {sheet.flavor.name} off the {shopName} board?
+                  {copy.confirmTitle(sheet.flavor.name, shopName)}
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">
                   It stays in your library. This only clears it from what
@@ -710,7 +747,7 @@ export default function CaseBoard({ shops, categories, flavors, example, voice, 
                     className="btn w-full disabled:opacity-60"
                     disabled={working || !newName.trim()}
                   >
-                    {working ? "Adding it…" : "Add it to the case"}
+                    {working ? "Adding it…" : copy.addIt}
                   </button>
                   <button
                     onClick={() => setSheet({ kind: "picker", category: sheet.category })}

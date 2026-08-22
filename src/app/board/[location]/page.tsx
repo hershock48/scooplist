@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import AutoRefresh from "@/components/AutoRefresh";
 import { locationById, locations } from "@/lib/locations";
 import { byCaseOrder, type CaseEntry, type Flavor } from "@/lib/domain";
-import { categories, allergens } from "@/lib/vertical";
+import { resolveVertical } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ function ago(t: number | null): string {
   return hours < 24 ? `updated ${hours}h ago` : `updated ${Math.round(hours / 24)}d ago`;
 }
 
-function BoardShell({ name, children }: { name: string; children: React.ReactNode }) {
+function BoardShell({ heading, children }: { heading: string; children: React.ReactNode }) {
   return (
     <main className="bg-board min-h-screen px-8 py-10 text-cream">
       {/* The refresh stays armed even on the failure path: recovery is the
@@ -51,7 +51,7 @@ function BoardShell({ name, children }: { name: string; children: React.ReactNod
       </noscript>
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="font-[family-name:var(--font-display)] text-5xl font-bold">
-          {name}, in the case
+          {heading}
         </h1>
       </header>
       {children}
@@ -68,6 +68,15 @@ export default async function BoardPage({
   const location = locationById(slug);
   if (!location) notFound();
 
+  /*
+    The heading speaks the vertical: "Marshall, in the case" but
+    "Cascarelli's, in the cooler" (his word for it). resolveVertical never
+    throws, its own store failure degrades to the scoops defaults, so it
+    is safe to call before the try below.
+  */
+  const vHead = await resolveVertical();
+  const heading = `${location.name}, ${vHead.nouns.prep} the ${vHead.nouns.surface}`;
+
   const store = getStore();
   let entries: CaseEntry[];
   let flavors: Flavor[];
@@ -81,7 +90,7 @@ export default async function BoardPage({
   } catch {
     // The next tick (60s) retries; the screen never shows a stack trace.
     return (
-      <BoardShell name={location.name}>
+      <BoardShell heading={heading}>
         <p className="mt-10 text-2xl text-cream/60">
           The board is catching its breath, back in a moment.
         </p>
@@ -94,7 +103,8 @@ export default async function BoardPage({
     .map((e) => ({ entry: e, flavor: byId.get(e.flavorId) }))
     .filter((x): x is { entry: CaseEntry; flavor: Flavor } => Boolean(x.flavor && !x.flavor.retired));
 
-  const boards = categories()
+  const v = vHead;
+  const boards = v.categories
     .map((c) => ({
       ...c,
       items: live
@@ -116,7 +126,7 @@ export default async function BoardPage({
     cream sentence, so a deployment with different allergens (or none, a
     tap list) reads correctly on its own screen.
   */
-  const legend = allergens();
+  const legend = v.allergens;
 
   return (
     <main className="bg-board min-h-screen px-8 py-10 text-cream">
@@ -127,7 +137,7 @@ export default async function BoardPage({
 
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="font-[family-name:var(--font-display)] text-5xl font-bold">
-          {location.name}, in the case
+          {heading}
         </h1>
         <p className="text-lg text-cream/60">{ago(updatedAt)}</p>
       </header>
@@ -201,7 +211,10 @@ export default async function BoardPage({
         )}
         {otherShops.length > 0 ? (
           <p className="text-sm">
-            Also scooping: {otherShops.map((l) => l.name).join(", ")}
+            {/* "Also scooping" is scoop vocabulary; everyone else "also pours"
+                nothing, they just have other locations. */}
+            {v.voice === "scoops" ? "Also scooping: " : "Also at: "}
+            {otherShops.map((l) => l.name).join(", ")}
           </p>
         ) : null}
       </footer>

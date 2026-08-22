@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { locations } from "@/lib/locations";
 import { blobToken, blobTokenVar } from "@/lib/blob";
 import { connectionVar, getStore } from "@/lib/store";
+import { resolveVertical } from "@/lib/vertical";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,6 +44,18 @@ export async function GET() {
       },
       library: { flavors },
       shops: locations().map((l) => l.id),
+      /*
+        What kind of business this deployment thinks it is, and WHO decided:
+        "env" = pinned by us in the dashboard, "store" = the owner's /setup
+        choice, "default" = nothing configured (scoops). setupPending means
+        a fresh install is still waiting on its first-run question.
+      */
+      vertical: await resolveVertical().then((v) => ({
+        preset: v.preset,
+        source: v.source,
+        setupPending: v.setupPending,
+        boards: v.categories.map((c) => c.key),
+      })),
       /*
         Which variables this RUNNING deployment can actually see. Names only,
         never values, enough to tell "not connected" from "connected to the

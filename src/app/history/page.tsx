@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
-import { voice } from "@/lib/vertical";
+import { resolveVertical } from "@/lib/vertical";
 import type { CaseEntry, Flavor } from "@/lib/domain";
 import { getStore } from "@/lib/store";
 
@@ -81,6 +81,9 @@ function since(t: number, now: number): string {
 export default async function HistoryPage() {
   if (!(await isAuthed())) redirect("/login");
 
+  const v = await resolveVertical();
+  if (v.setupPending) redirect("/setup");
+
   const store = getStore();
   const now = Date.now();
   const shops = locations();
@@ -89,10 +92,15 @@ export default async function HistoryPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6">
-      <AppHeader current="history" boardHref={`/board/${shops[0]?.id ?? ""}`} voice={voice()} />
+      <AppHeader
+        current="history"
+        boardHref={`/board/${shops[0]?.id ?? ""}`}
+        voice={v.voice}
+        nouns={v.nouns}
+      />
 
       <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-semibold">
-        {voice() === "neutral" ? "What the board remembers" : "What the case remembers"}
+        What the {v.nouns.surface} remembers
       </h1>
       {/* Say what each column MEANS, in the sentence, not in a tooltip: the
           owner's first reaction to this page was "no clue what it's
@@ -135,7 +143,7 @@ export default async function HistoryPage() {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wide text-ink-soft">
                       <th scope="col" className="px-4 py-3 font-semibold">
-                        {voice() === "neutral" ? "Item" : "Flavor"}
+                        {v.nouns.item.charAt(0).toUpperCase() + v.nouns.item.slice(1)}
                       </th>
                       <th scope="col" className="px-3 py-3 font-semibold">Times on</th>
                       <th scope="col" className="px-3 py-3 font-semibold">Days total</th>
