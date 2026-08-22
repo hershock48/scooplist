@@ -90,13 +90,28 @@ export function allergens(): string[] {
     .filter(Boolean);
 }
 
-/** The starting price list for a category: env override, else ice cream. */
+/**
+ * The starting price list for a category: env override, else ice cream.
+ *
+ * "-" means DELIBERATELY NONE, the allergens() convention: a bare
+ * SCOOPLIST_SIZES=- gives every category no default prices, and a block
+ * whose list is "-" (taps=-) does the same for that one category. Both
+ * are checked BEFORE the pipe-parse on purpose, "-" parses to zero valid
+ * sizes and would otherwise fall through to the ice cream list, which is
+ * exactly the bug this mode exists to prevent (a 7% IPA priced
+ * Mini/Small/Large, observed on the Cascarelli's test instance). A bar
+ * with no size pricing sets "-" instead of inventing prices, and a
+ * flavor that still needs one (a rare bottle) gets it per flavor in the
+ * library.
+ */
 export function defaultSizesFor(categoryKey: string): Size[] {
-  const raw = process.env.SCOOPLIST_SIZES;
+  const raw = process.env.SCOOPLIST_SIZES?.trim();
+  if (raw === "-") return [];
   if (raw) {
     for (const block of raw.split(";")) {
       const [key, list] = block.split("=");
-      if (key?.trim() !== categoryKey || !list) continue;
+      if (key?.trim() !== categoryKey || list === undefined) continue;
+      if (list.trim() === "-") return [];
       const sizes = list
         .split("|")
         .map((pair) => {
@@ -107,5 +122,14 @@ export function defaultSizesFor(categoryKey: string): Size[] {
       if (sizes.length > 0) return sizes;
     }
   }
+  /*
+    The ice cream lists are only a sensible default for the ice cream
+    vertical. A deployment that configured its own categories gets NO
+    guessed prices for a category it did not price, a placeholder-rule
+    call: silence beats an invented number that reads as real. (This is
+    also the belt to "-"'s suspenders: the observed bug happened on a bar
+    instance with SCOOPLIST_SIZES entirely unset.)
+  */
+  if (process.env.SCOOPLIST_CATEGORIES) return DEFAULT_SIZES[categoryKey] ?? [];
   return DEFAULT_SIZES[categoryKey] ?? DEFAULT_SIZES.handscooped;
 }

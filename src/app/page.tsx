@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import FlipWord from "@/components/FlipWord";
 import ScooplistMark from "@/components/Logo";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
@@ -31,11 +32,14 @@ export default async function Home() {
       {/*
         Kevin's line, and it beats the one it replaced: "fresh daily" was
         borrowed from glazedweb's cadence, while this names what the product
-        actually sells, a board that is RIGHT. Everything else here is
-        plumbing in service of that one claim.
+        actually sells, a board that is RIGHT. The first word rolls through
+        the verticals (his ask, once the app grew a second one): Flavor,
+        Menu, Tap, Specials boards, one engine. No JS or reduced motion =
+        the static "Flavor" line, complete.
       */}
       <p className="mt-2 font-[family-name:var(--font-display)] text-xl font-semibold text-ink sm:text-2xl lg:text-3xl">
-        Flavor boards that taste like the truth.
+        <FlipWord words={["Flavor", "Menu", "Tap", "Specials"]} /> boards that
+        taste like the truth.
       </p>
       {/*
         The explainer paragraph that used to sit here is gone at Kevin's call.

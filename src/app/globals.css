@@ -142,10 +142,26 @@
   50% { opacity: 0.95; }
 }
 
+/* The tagline's rolling first word (FlipWord.tsx): the new word rides up
+   into place while the old one leaves through the top. 110% so a descender
+   is fully clear of the clip before it parks. */
+.sl-flip-in { animation: sl-flip-in 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.sl-flip-out { animation: sl-flip-out 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+@keyframes sl-flip-in {
+  from { transform: translateY(110%); }
+  to { transform: translateY(0); }
+}
+@keyframes sl-flip-out {
+  from { transform: translateY(0); }
+  to { transform: translateY(-110%); }
+}
+
 /* The resting state is the finished drawing: no motion, nothing missing. */
 @media (prefers-reduced-motion: reduce) {
   .sl-goo, .sl-wob1, .sl-wob2, .sl-wob3, .sl-wobB, .sl-sheen { animation: none; }
   .sl-string, .sl-droplet, .sl-droplet2 { animation: none; opacity: 0; }
+  /* FlipWord also never starts its timer; this covers a swap already mid-flight. */
+  .sl-flip-in, .sl-flip-out { animation: none; }
 }
 
 @layer components {
