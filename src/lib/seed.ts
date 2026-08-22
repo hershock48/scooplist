@@ -1,9 +1,10 @@
 import "server-only";
 
 import { newId, type Allergen, type CategoryKey, type Flavor } from "@/lib/domain";
-import { defaultSizesFor } from "@/lib/vertical";
+import { categories, defaultSizesFor } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 import { locations } from "@/lib/locations";
+import { BAR_SEED, BAR_SEED_KEYS } from "@/lib/seed-bar";
 
 /**
  * First-run seed: True North's real board (their site, August 2026), so the
@@ -78,16 +79,25 @@ export async function seedIfEmpty(): Promise<void> {
   if (g.__scooplistSeeded) return;
 
   /*
-    The seed is True North's ICE CREAM board, demo data for the default
-    vertical only. A deployment that has configured its own categories (a
-    tap list) must start empty: forty ice cream flavors whose categories
-    match none of its boards would be invisible on every screen and still
-    pollute the library and the picker.
+    Which vertical's demo data fits this deployment:
+    - Default (no custom categories): True North's ICE CREAM board.
+    - Categories covering the full tavern contract: Cascarelli's BAR
+      program (seed-bar.ts) - same precedent, the first client of the
+      vertical is its demo data.
+    - Any other custom categories: start empty. Rows whose categories
+      match none of the boards would be invisible on every screen and
+      still pollute the library and the picker.
   */
+  let seedFn: (() => Promise<void>) | null = seed;
   if (process.env.SCOOPLIST_CATEGORIES) {
+    const keys = new Set(categories().map((c) => c.key));
+    seedFn = BAR_SEED_KEYS.every((k) => keys.has(k)) ? seedBar : null;
+  }
+  if (!seedFn) {
     g.__scooplistSeeded = true;
     return;
   }
+  const run = seedFn;
 
   const store = getStore();
   if (await store.hasAnyFlavors()) {
@@ -97,9 +107,51 @@ export async function seedIfEmpty(): Promise<void> {
 
   await store.once(async () => {
     if (await store.hasAnyFlavors()) return;
-    await seed();
+    await run();
   });
   g.__scooplistSeeded = true;
+}
+
+/** The tavern seed: every row into the library and every shop's case, in
+    menu order (positions set, so the boards match the printed lists rather
+    than going alphabetical). */
+async function seedBar(): Promise<void> {
+  const store = getStore();
+  const now = Date.now();
+  const shops = locations();
+
+  const ids: string[] = [];
+  for (const row of BAR_SEED) {
+    const flavor: Flavor = {
+      id: newId("flv"),
+      name: row.name,
+      description: row.description,
+      category: row.category,
+      allergens: [],
+      tags: row.tags,
+      producer: row.producer,
+      abv: row.abv,
+      photoUrl: "",
+      sizes: row.sizes,
+      retired: false,
+      createdAt: now,
+    };
+    await store.upsertFlavor(flavor);
+    ids.push(flavor.id);
+  }
+
+  for (const shop of shops) {
+    for (let i = 0; i < ids.length; i += 1) {
+      await store.addToCase({
+        id: newId("case"),
+        locationId: shop.id,
+        flavorId: ids[i],
+        addedAt: now,
+        removedAt: null,
+        position: i,
+      });
+    }
+  }
 }
 
 async function seed(): Promise<void> {
