@@ -10,7 +10,7 @@ import { useRef, useState } from "react";
  *  - The gesture NEVER decides for you. A completed swipe opens a confirm
  *    sheet; nothing leaves the board until the owner says so.
  *  - It must not fight the page. `touch-action: pan-y` leaves vertical
- *    scrolling to the browser, and the first few pixels decide the axis —
+ *    scrolling to the browser, and the first few pixels decide the axis,
  *    once a drag is judged vertical it is abandoned, so scrolling past a
  *    row never smears it sideways.
  *  - Tap still works. A press that never crosses the slop threshold falls
@@ -44,7 +44,7 @@ export default function SwipeCard({
    * Without this latch the swipe fired onSwiped and then the click fired
    * onTap, so a swipe opened the details sheet on top of the confirm sheet
    * and looked like the gesture had done nothing. Any horizontal gesture
-   * eats exactly one click — including one that snapped back, because that
+   * eats exactly one click, including one that snapped back, because that
    * was a cancelled swipe, not a tap.
    */
   const swallowClick = useRef(false);

@@ -1,13 +1,13 @@
 /**
- * The Scooplist mark v4 — from Kevin's sketch at the glazedweb logo's own
+ * The Scooplist mark v4, from Kevin's sketch at the glazedweb logo's own
  * proportions: goo creep LOW on the scoop, fat drips (~21% of scoop width,
  * the donut's ratio) owning the whole underside, green goo construction
  * transplanted from the logo (gradients, dark back layer, creep band, cream
  * highlights, droplet, dark accent), narrow brown cone, sprinkles clear of
  * the fat swoosh+dot sheen. RENDERED AND EYEBALLED against the logo before
- * shipping — never trust path arithmetic alone.
+ * shipping, never trust path arithmetic alone.
  *
- * icon.svg is this exact artwork — keep them in sync (this file was
+ * icon.svg is this exact artwork, keep them in sync (this file was
  * generated from it).
  */
 export default function ScooplistMark({

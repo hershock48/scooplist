@@ -4,7 +4,7 @@ import { checkPin, pinLocked, setAuthCookie } from "@/lib/auth";
 export const runtime = "nodejs";
 
 function address(request: Request): string {
-  // Vercel sets x-forwarded-for; locally there may be nothing — one shared
+  // Vercel sets x-forwarded-for; locally there may be nothing, one shared
   // bucket beats no throttle.
   return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
 }

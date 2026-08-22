@@ -12,13 +12,13 @@ import type { ShopLocation } from "@/lib/locations";
  * the dipping cabinet with cold hands and a line.
  *
  *  - Pulling a tub is a swipe (or a tap, or a keypress) and then a confirm.
- *    Never a bare gesture — a mis-swipe must not silently change the menu a
+ *    Never a bare gesture, a mis-swipe must not silently change the menu a
  *    customer is reading.
  *  - Every board carries its own "+" pill, so restocking hand-scooped shows
  *    hand-scooped and nothing else. Boards with nothing in them still show
  *    their pill, because that is exactly when you need it.
  *  - Every mutation runs through post(), which owns the double-tap latch
- *    (a ref, synchronous — state is too slow for two taps in one tick), the
+ *    (a ref, synchronous, state is too slow for two taps in one tick), the
  *    401 walk back to /login, and errors rendered INSIDE the open sheet,
  *    because behind the backdrop is where failures go to be missed.
  */
@@ -60,7 +60,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
     [caseByShop, shopId],
   );
 
-  /* Every board, always — an empty one still needs its "+" pill. */
+  /* Every board, always, an empty one still needs its "+" pill. */
   const boards = useMemo(
     () =>
       CATEGORIES.map((c) => ({
@@ -137,12 +137,12 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
       }
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
-        setError(typeof json.error === "string" ? json.error : "That didn't stick — try again.");
+        setError(typeof json.error === "string" ? json.error : "That didn't stick, try again.");
         return null;
       }
       return json;
     } catch {
-      setError("That didn't stick — check the connection and try again.");
+      setError("That didn't stick, check the connection and try again.");
       return null;
     } finally {
       inFlightRef.current = false;
@@ -255,7 +255,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
               {b.flavors.map((f) => (
                 <li key={f.id}>
                   <SwipeCard
-                    label={`${f.name} — tap for details, swipe left to take off the board`}
+                    label={`${f.name}, tap for details, swipe left to take off the board`}
                     onTap={() => openSheet({ kind: "flavor", flavor: f })}
                     onSwiped={() => openSheet({ kind: "confirm", flavor: f })}
                   >
@@ -376,7 +376,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                   Take {sheet.flavor.name} off the {shopName} board?
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">
-                  It stays in your library — this only clears it from what
+                  It stays in your library. This only clears it from what
                   customers see right now.
                 </p>
                 <div className="mt-5 grid gap-3">
@@ -402,7 +402,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                     onClick={() => openSheet({ kind: "confirm", flavor: sheet.flavor })}
                     className="btn w-full"
                   >
-                    Tub&apos;s empty — take it off the board
+                    Tub&apos;s empty, take it off the board
                   </button>
                   <button onClick={() => setSheet(null)} className="btn-ghost w-full">
                     Never mind
@@ -448,7 +448,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
 
                 {pickable.length === 0 ? (
                   <p className="mt-3 text-sm text-ink-soft">
-                    Nothing left in the library for this board — make a new one below.
+                    Nothing left in the library for this board, make a new one below.
                   </p>
                 ) : null}
 

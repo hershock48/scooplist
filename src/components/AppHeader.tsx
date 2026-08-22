@@ -9,11 +9,11 @@ import ScooplistMark from "@/components/Logo";
  *
  * On a phone four inline links (case / library / TV board / sign out) wrapped
  * into a jumble beside the wordmark, so everything past the first tap target
- * looked like debris. Above `sm` they stay inline — there is room, and one
+ * looked like debris. Above `sm` they stay inline, there is room, and one
  * tap beats two. Below it, one Menu button opens a real dropdown.
  *
  * The dropdown closes on Escape, on an outside click, and on any navigation
- * inside it — a menu that stays open over the page you just asked for is the
+ * inside it, a menu that stays open over the page you just asked for is the
  * classic mobile-nav bug.
  */
 

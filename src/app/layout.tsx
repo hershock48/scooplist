@@ -3,7 +3,7 @@ import { Fraunces, Figtree } from "next/font/google";
 import "./globals.css";
 
 /*
-  Fraunces carries display sizes — an ice cream parlor's warmth without any
+  Fraunces carries display sizes, an ice cream parlor's warmth without any
   one client's brand. Figtree carries the working UI. Both self-hosted by
   next/font per the house stack rules.
 */
@@ -22,7 +22,7 @@ const body = Figtree({
 
 export const metadata: Metadata = {
   title: {
-    default: "Scooplist — flavor boards that taste like the truth",
+    default: "Scooplist, flavor boards that taste like the truth",
     template: "%s | Scooplist",
   },
   description:
@@ -30,13 +30,13 @@ export const metadata: Metadata = {
   /*
     The share card, in glazedweb's own composition: cream field, the mark
     large and centered, the name and tagline beneath. Regenerate it with
-    tools/make-og.mjs whenever the mark or the tagline changes — it is
+    tools/make-og.mjs whenever the mark or the tagline changes, it is
     a rendered PNG, and you cannot grep an image.
   */
   openGraph: {
     type: "website",
     siteName: "Scooplist",
-    title: "Scooplist — flavor boards that taste like the truth",
+    title: "Scooplist, flavor boards that taste like the truth",
     description:
       "Blow through a tub at 2:15. By 2:16 the website, the TV board, and the sign over the counter have all caught up.",
     images: [

@@ -6,13 +6,13 @@ import "server-only";
  * Ported from devine/src/lib/workroom/store.ts, the account's newest copy of
  * the two-backend shape per glaze/catalog/apps.md. The jsonb-blob decision and
  * the self-creating tables are its; the domain here is a scoop shop: flavors
- * (the library — everything the shop has ever churned) and case entries
+ * (the library, everything the shop has ever churned) and case entries
  * (which flavors are in which shop's dipping cabinet right now).
  *
  * Two backends behind one interface:
  *
  *   postgres   when DATABASE_URL (or POSTGRES_URL) is set. One click in
- *              Vercel: project > Storage > Create Database > Neon, free tier —
+ *              Vercel: project > Storage > Create Database > Neon, free tier,
  *              part of the hosting the shop already has, so it does not break
  *              the "nothing rented" rule. Tables create themselves on first use.
  *
@@ -21,11 +21,11 @@ import "server-only";
  *              admin shows a plain warning when it is on memory: a demo that
  *              half-works silently is worse than one that says what is wrong.
  *
- * A case entry is never deleted, only closed (removedAt) — the history IS the
+ * A case entry is never deleted, only closed (removedAt), the history IS the
  * product's future analytics ("mint chip lasted four days"), and closing beats
  * deleting for the same reason a bar logs a blown keg instead of erasing it.
  *
- * Types and constants live in domain.ts (client-safe, no pg import) — the
+ * Types and constants live in domain.ts (client-safe, no pg import), the
  * browser UI imports THAT, never this file.
  */
 
@@ -34,7 +34,7 @@ import type { CaseEntry, Flavor } from "@/lib/domain";
 type Store = {
   backend: "postgres" | "memory";
   listFlavors(): Promise<Flavor[]>;
-  /** Cheap emptiness probe — the seed check must not haul every jsonb row. */
+  /** Cheap emptiness probe, the seed check must not haul every jsonb row. */
   hasAnyFlavors(): Promise<boolean>;
   getFlavor(id: string): Promise<Flavor | null>;
   upsertFlavor(f: Flavor): Promise<void>;
@@ -43,7 +43,7 @@ type Store = {
   /**
    * IDEMPOTENT: a flavor already open at this shop is not added twice. The
    * guard lives here (unique partial index / in-store check), not in the API
-   * route — a check-then-insert in the route is a race two double-tap POSTs
+   * route, a check-then-insert in the route is a race two double-tap POSTs
    * will lose.
    */
   addToCase(e: CaseEntry): Promise<void>;
@@ -52,7 +52,7 @@ type Store = {
   /** When anything about a shop's case last changed, for "updated x ago". */
   caseUpdatedAt(locationId: string): Promise<number | null>;
   /**
-   * Run `fn` at most once across concurrent callers — the seed guard. On
+   * Run `fn` at most once across concurrent callers, the seed guard. On
    * postgres this takes an advisory lock so two cold serverless instances
    * cannot both seed a fresh database; in memory a memoized promise does it.
    */

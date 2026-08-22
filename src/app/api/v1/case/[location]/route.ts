@@ -18,7 +18,7 @@ export const runtime = "nodejs";
  *       allergens, tags, photoUrl, sizes, inCaseSince } ] } ]
  *   }
  *
- * CORS is open on purpose — the data is a public menu — and consumers are
+ * CORS is open on purpose, the data is a public menu, and consumers are
  * told to treat the feed as unavailable-tolerant: cache the last good copy.
  */
 export async function GET(_req: Request, ctx: { params: Promise<{ location: string }> }) {

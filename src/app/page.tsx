@@ -5,12 +5,12 @@ import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
 
 /*
-  Signed in, the root IS the case — zero taps between opening the app and
+  Signed in, the root IS the case, zero taps between opening the app and
   the thing the owner came to do. Signed out, the brand moment: the mark
   big and dripping with the name under it, centered, which is glazedweb's
   own mobile hero (its .hero collapses to one centered column at 800px and
-  moves .mark to order:-1, above the words). Sizes follow its lead too —
-  165px on a phone, 230px up — so the two sites feel like one studio.
+  moves .mark to order:-1, above the words). Sizes follow its lead too,
+  165px on a phone, 230px up, so the two sites feel like one studio.
 */
 export default async function Home() {
   if (await isAuthed()) redirect("/case");
@@ -31,21 +31,18 @@ export default async function Home() {
       {/*
         Kevin's line, and it beats the one it replaced: "fresh daily" was
         borrowed from glazedweb's cadence, while this names what the product
-        actually sells — a board that is RIGHT. Everything else here is
+        actually sells, a board that is RIGHT. Everything else here is
         plumbing in service of that one claim.
       */}
       <p className="mt-2 font-[family-name:var(--font-display)] text-xl font-semibold text-ink sm:text-2xl lg:text-3xl">
         Flavor boards that taste like the truth.
       </p>
       {/*
-        The pitch is a scene, not a feature list: a real thing that happens at
-        2:15 on a Saturday, and the punchline is who did NOT have to be called.
+        The explainer paragraph that used to sit here is gone at Kevin's call.
+        The tagline is the whole pitch: anyone who lands here is either the
+        owner going to /login or a customer going to a board, and both were
+        stepping over three sentences to reach the buttons.
       */}
-      <p className="mt-5 max-w-md text-lg leading-relaxed text-ink-soft lg:max-w-lg lg:text-xl">
-        You blow through the mint chip at 2:15. By 2:16 your website knows,
-        your TV board knows, and the sign over the counter knows. Nobody
-        called anybody.
-      </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link href="/login" className="btn">
           Open the case

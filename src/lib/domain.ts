@@ -1,6 +1,6 @@
 /**
  * The domain, client-safe: types and constants both the browser UI and the
- * server store speak. No imports, no server-only — store.ts layers the
+ * server store speak. No imports, no server-only, store.ts layers the
  * database on top of this, never the other way around.
  */
 
@@ -32,7 +32,7 @@ export type Flavor = {
   /** Blob URL in production; a data: URL on the no-Blob demo path. */
   photoUrl: string;
   /**
-   * Price by size — the flavor's default list, seeded from its category.
+   * Price by size, the flavor's default list, seeded from its category.
    */
   sizes: Size[];
   /**
@@ -53,7 +53,7 @@ export type Flavor = {
   /**
    * When it was retired, so a mistake is recoverable at a glance.
    *
-   * Nothing is ever deleted — retiring only hides a flavor from the boards
+   * Nothing is ever deleted, retiring only hides a flavor from the boards
    * and the pickers. This timestamp exists so the library can put the last
    * day's retirements on a shelf of their own, where an accidental tap is
    * one tap back. Older ones are still there behind "Show retired"; they
@@ -72,7 +72,7 @@ export type CaseEntry = {
   removedAt: number | null;
 };
 
-/** Sensible starting prices per category — True North's published menu. */
+/** Sensible starting prices per category, True North's published menu. */
 export const DEFAULT_SIZES: Record<CategoryKey, Size[]> = {
   handscooped: [
     { label: "Mini", price: "$4.75" },
@@ -107,7 +107,7 @@ export function hasShopPricing(flavor: Flavor): boolean {
   return Object.values(flavor.sizesByShop ?? {}).some((s) => s && s.length > 0);
 }
 
-/** Retired within the recovery window — the shelf you can still undo from. */
+/** Retired within the recovery window, the shelf you can still undo from. */
 export const RETIRE_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export function recentlyRetired(flavor: Flavor, now = Date.now()): boolean {

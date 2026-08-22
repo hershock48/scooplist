@@ -8,7 +8,7 @@ import { locations } from "@/lib/locations";
  * First-run seed: True North's real board (their site, August 2026), so the
  * demo the owner sees is his own case, not lorem ipsum. Runs once, only when
  * the library is empty; a cleared database reseeds, a working one is never
- * touched. Soft serve lands only in Marshall's case — the machine is theirs.
+ * touched. Soft serve lands only in Marshall's case, the machine is theirs.
  */
 
 type SeedRow = [name: string, category: CategoryKey, allergens?: Allergen[], description?: string];
@@ -60,7 +60,7 @@ const SEED: SeedRow[] = [
 export async function seedIfEmpty(): Promise<void> {
   /*
     Three layers, cheapest first: a per-process flag (free after the first
-    hit), a SELECT 1 probe (never the full jsonb library — inline photos make
+    hit), a SELECT 1 probe (never the full jsonb library, inline photos make
     that megabytes), and the store's once() guard with a re-check inside, so
     two cold instances racing a fresh database cannot both seed it.
   */
@@ -105,7 +105,7 @@ async function seed(): Promise<void> {
 
   for (const shop of shops) {
     for (const { id, category } of ids) {
-      // The soft serve machine is Marshall's (Choose Marshall article) —
+      // The soft serve machine is Marshall's (Choose Marshall article),
       // the one seeded per-shop difference, and the demo's proof the app
       // understands that shops differ.
       if (category === "softserve" && shop.id !== "marshall") continue;

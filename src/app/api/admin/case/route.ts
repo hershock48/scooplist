@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 /**
  * The case, changing: { action: "in" | "out", locationId, flavorId }.
  * "in" is idempotent (a double-tap must not create two entries) and "out"
- * closes rather than deletes — the history is future analytics.
+ * closes rather than deletes, the history is future analytics.
  */
 export async function POST(request: Request) {
   if (!(await isAuthed())) {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   if (b.action === "in") {
     // Idempotency lives in the STORE (unique partial index / in-store
-    // check) — a check here would be a race two double-tap POSTs can lose.
+    // check), a check here would be a race two double-tap POSTs can lose.
     await store.addToCase({
       id: newId("case"),
       locationId: location.id,

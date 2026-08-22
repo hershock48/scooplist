@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   if (!name) return NextResponse.json({ error: "The flavor needs a name." }, { status: 400 });
 
   /*
-   * photoUrl is REJECTED over the cap, never truncated — a sliced data: URL
+   * photoUrl is REJECTED over the cap, never truncated, a sliced data: URL
    * saves "ok" and renders as a broken image everywhere. The cap clears the
    * photo route's inline maximum (1.5M base64 + the data: prefix) with room.
    */
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
   if (b.photoUrl !== undefined) {
     if (typeof b.photoUrl !== "string" || b.photoUrl.length > 2_000_000) {
       return NextResponse.json(
-        { error: "That photo is too large to store — try uploading it again." },
+        { error: "That photo is too large to store, try uploading it again." },
         { status: 413 },
       );
     }
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     retired: typeof b.retired === "boolean" ? b.retired : existing?.retired ?? false,
     /*
       Stamped the moment it is retired and cleared the moment it comes back,
-      so the recovery shelf measures from the actual decision — not from
+      so the recovery shelf measures from the actual decision, not from
       whenever the row was last touched for an unrelated edit.
     */
     retiredAt:

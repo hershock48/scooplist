@@ -34,7 +34,7 @@ export default async function CasePage() {
       {store.backend === "memory" ? (
         <p className="card mt-4 border-berry/40 bg-berry/5 px-4 py-3 text-sm font-medium text-berry">
           Demo mode: changes here aren&apos;t saved permanently yet. Ask your
-          web person to switch on storage — it&apos;s one click for them.
+          web person to switch on storage, it&apos;s one click for them.
         </p>
       ) : null}
 

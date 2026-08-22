@@ -3,7 +3,7 @@ import "server-only";
 /**
  * Find the Vercel Blob token whatever Vercel decided to call it.
  *
- * Connecting a Blob store injects `BLOB_READ_WRITE_TOKEN` — UNLESS the store
+ * Connecting a Blob store injects `BLOB_READ_WRITE_TOKEN`, UNLESS the store
  * carries a custom name/prefix, in which case the variable arrives as
  * e.g. `SCOOPLIST_BLOB_READ_WRITE_TOKEN`. The first deploy hit exactly that:
  * the store was connected, the app reported "no photo storage", and the

@@ -11,7 +11,7 @@ export const runtime = "nodejs";
  * With BLOB_READ_WRITE_TOKEN set (Vercel Blob, one click, part of the
  * hosting) the photo lands in Blob storage and a real URL comes back.
  * Without it, the photo is returned as a data: URL and stored inline in the
- * flavor row — fine for a demo, capped hard, and the admin says which mode
+ * flavor row, fine for a demo, capped hard, and the admin says which mode
  * it is in rather than pretending.
  */
 const MAX_BASE64 = 1_500_000; // ~1.1MB decoded; client-side resize keeps real uploads far below.
@@ -36,12 +36,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Send a JPEG, PNG, or WebP." }, { status: 400 });
   }
   if (data.length > MAX_BASE64) {
-    return NextResponse.json({ error: "Photo too large — try again, it will re-compress." }, { status: 413 });
+    return NextResponse.json({ error: "Photo too large, try again, it will re-compress." }, { status: 413 });
   }
   // Real base64 or nothing: Buffer.from silently skips invalid characters,
   // which would store a garbage "photo" and report success.
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data) || data.length % 4 !== 0) {
-    return NextResponse.json({ error: "That photo didn't come through — try again." }, { status: 400 });
+    return NextResponse.json({ error: "That photo didn't come through, try again." }, { status: 400 });
   }
 
   const token = blobToken();

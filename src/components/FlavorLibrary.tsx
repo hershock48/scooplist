@@ -17,11 +17,11 @@ import {
 import type { ShopLocation } from "@/lib/locations";
 
 /**
- * The library: everything the shop has ever churned, edited in place — and
+ * The library: everything the shop has ever churned, edited in place, and
  * created here too, because prepping next week's menu from the couch must
  * not require boarding a flavor at a live shop. Photos are resized in the
  * browser before upload (a phone camera shot is 4MB the server never
- * needs), every failure says so out loud, and retiring beats deleting — a
+ * needs), every failure says so out loud, and retiring beats deleting, a
  * retired flavor keeps its history and can come back next summer.
  */
 
@@ -63,7 +63,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
   const [newCategory, setNewCategory] = useState<CategoryKey>("handscooped");
   /** The open editor sets this; collapsing a dirty editor asks first. */
   const dirtyRef = useRef(false);
-  /** Synchronous double-tap latch — `busy` state is async and misses same-tick taps. */
+  /** Synchronous double-tap latch, `busy` state is async and misses same-tick taps. */
   const inFlightRef = useRef(false);
 
   const working = busy || pending;
@@ -91,8 +91,8 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
   */
   /*
     THE RETIREMENT HOME: everything retired in the last day, on its own shelf
-    at the bottom with a one-tap way back. Retiring is not destruction —
-    nothing is ever deleted — but a mis-tap should not send you hunting
+    at the bottom with a one-tap way back. Retiring is not destruction,
+    nothing is ever deleted, but a mis-tap should not send you hunting
     through a checkbox filter to undo it.
   */
   const retirementHome = useMemo(
@@ -137,7 +137,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
       }
       const json = (await res.json().catch(() => ({}))) as { error?: string; flavor?: Flavor };
       if (!res.ok) {
-        setError(json.error ?? "That didn't save — try again.");
+        setError(json.error ?? "That didn't save, try again.");
         return null;
       }
       dirtyRef.current = false;
@@ -145,7 +145,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
       startTransition(() => router.refresh());
       return json.flavor ?? null;
     } catch {
-      setError("That didn't save — check the connection and try again.");
+      setError("That didn't save, check the connection and try again.");
       return null;
     } finally {
       inFlightRef.current = false;
@@ -178,7 +178,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
 
   return (
     <div aria-busy={working}>
-      {/* Create here, not just from the case — no shop's board required. */}
+      {/* Create here, not just from the case, no shop's board required. */}
       <div className="card mt-5 p-4">
         <label htmlFor="lib-new" className="block text-sm font-semibold">
           New flavor
@@ -208,7 +208,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
           </button>
         </div>
         <p className="mt-2 text-xs text-ink-soft">
-          It lands in the library only — put it in a case from The Case screen
+          It lands in the library only, put it in a case from The Case screen
           when it&apos;s churned.
         </p>
       </div>
@@ -275,7 +275,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
                       <span className={`block font-semibold ${f.retired ? "text-ink-soft line-through" : ""}`}>
                         {f.name}
                       </span>
-                      {/* Where it is RIGHT NOW — the thing the old flat list never said. */}
+                      {/* Where it is RIGHT NOW, the thing the old flat list never said. */}
                       <span className="block text-xs text-ink-soft">
                         {out.length > 0
                           ? `In the case: ${out
@@ -308,7 +308,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
       {visible.length === 0 && retirementHome.length === 0 ? (
         <p className="card mt-4 px-4 py-6 text-center text-sm text-ink-soft">
           No flavor matches that
-          {!showRetired ? " — it might be retired; flip on “Show retired” above" : ""}.
+          {!showRetired ? ", it might be retired; flip on “Show retired” above" : ""}.
         </p>
       ) : null}
 
@@ -320,7 +320,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
           </h2>
           <p className="mt-1 text-sm text-ink-soft">
             Retired in the last day. Bring one back and it returns to the
-            library exactly as it was — after that it stays retired, and
+            library exactly as it was, after that it stays retired, and
             “Show retired” above still finds it.
           </p>
           <ul className="mt-4 grid gap-2">
@@ -352,7 +352,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
   );
 }
 
-/** "23 hours left to undo" — plain, and never negative. */
+/** "23 hours left to undo", plain, and never negative. */
 function hoursLeft(retiredAt?: number | null): string {
   if (!retiredAt) return "recoverable";
   const left = retiredAt + RETIRE_GRACE_MS - Date.now();
@@ -426,7 +426,7 @@ function FlavorEditor({
     // A half-filled size row must not vanish silently on save.
     const halfFilled = sizes.some((s) => (s.label.trim() === "") !== (s.price.trim() === ""));
     if (halfFilled) {
-      setError("One of the size rows is missing its name or price — fill it in or clear both boxes.");
+      setError("One of the size rows is missing its name or price, fill it in or clear both boxes.");
       return;
     }
     await save(
@@ -437,7 +437,7 @@ function FlavorEditor({
         category,
         allergens,
         sizes: sizes.filter((s) => s.label.trim() && s.price.trim()),
-        // Off means "every shop uses the default" — an empty object clears it.
+        // Off means "every shop uses the default", an empty object clears it.
         sizesByShop: perShop
           ? Object.fromEntries(
               shops.map((s) => [
@@ -468,15 +468,15 @@ function FlavorEditor({
       }
       const json = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
       if (!res.ok || !json.url) {
-        setError(json.error ?? "The photo didn't upload — try again.");
+        setError(json.error ?? "The photo didn't upload, try again.");
         return;
       }
       const ok = await save({ id: flavor.id, photoUrl: json.url }, "Photo added");
       if (!ok) return; // save() already surfaced its error
     } catch {
       // A file the browser can't decode (HEIC on some browsers, a corrupt
-      // shot) rejects in resizeToJpeg — that must not fail silently.
-      setError("Couldn't read that photo — try a different one, or a screenshot of it.");
+      // shot) rejects in resizeToJpeg, that must not fail silently.
+      setError("Couldn't read that photo, try a different one, or a screenshot of it.");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -639,7 +639,7 @@ function FlavorEditor({
             }
             save(
               { id: flavor.id, retired: !flavor.retired },
-              flavor.retired ? `${flavor.name} is back` : `${flavor.name} retired — recoverable for 24 hours`,
+              flavor.retired ? `${flavor.name} is back` : `${flavor.name} retired, recoverable for 24 hours`,
             );
           }}
           className="min-h-12 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline"

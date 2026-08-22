@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 
 /**
  * Scooplist auth: a PIN and a cookie. A gate, not a vault (the pjs/devine
- * words, still true) — nothing behind it moves money, and the worst a
+ * words, still true), nothing behind it moves money, and the worst a
  * breached gate can do is put Butter Pecan in the case, visibly, with
  * history. But a gate should still latch:
  *
@@ -14,7 +14,7 @@ import { cookies } from "next/headers";
  *    without it the key derives from the PIN (the cookie still never
  *    exposes the PIN to shoulder-surfing devtools).
  *  - Failed PINs throttle per address: 5 misses locks that address out for
- *    10 minutes. Per-process on serverless — a determined attacker can
+ *    10 minutes. Per-process on serverless, a determined attacker can
  *    spread across instances, which is exactly why the README's
  *    productization list has real auth on it. This raises the bar from
  *    "script the 10,000" to "not worth it for a menu."

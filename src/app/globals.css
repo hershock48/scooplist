@@ -2,14 +2,14 @@
 
 @theme {
   /*
-    Scooplist's own palette — deliberately NOT any client's. The tool serves
+    Scooplist's own palette, deliberately NOT any client's. The tool serves
     every shop, so it wears neutral cream and one berry accent.
 
     CONTRAST, MEASURED (against cream #FDFBF7):
-      berry       #B93A60   5.6  — buttons, links, small text. AA at any size.
-      berry-brt   #D64570   4.1  — fills, chips, large display only. Not body.
-      ink         #221D27  15.4  — body text.
-      ink-soft    #4A424F   8.9  — secondary text.
+      berry       #B93A60   5.6 , buttons, links, small text. AA at any size.
+      berry-brt   #D64570   4.1 , fills, chips, large display only. Not body.
+      ink         #221D27  15.4 , body text.
+      ink-soft    #4A424F   8.9 , secondary text.
     Board (TV) surfaces are ink-dark #17131C with cream text (14.9).
   */
   --color-berry: #B93A60;
@@ -43,7 +43,7 @@
 
   /*
     Tailwind 4 dropped preflight's `button { cursor: pointer }`, so every
-    button in the app was showing the arrow — it read as "not clickable" on
+    button in the app was showing the arrow, it read as "not clickable" on
     anything that looks like a link rather than a filled button. Put it back,
     and leave disabled controls alone: a pointer on a dead button is a lie.
   */
@@ -69,7 +69,7 @@
 
 /* ---------------------------------------------------------------------------
    The drip, transposed from glazedweb's AnimatedMark (app/globals.css lines
-   88-117 there). Same keyframes, same durations, same negative delays — the
+   88-117 there). Same keyframes, same durations, same negative delays, the
    desync between the four sags is what makes it read as goo instead of a
    pulsing blob, so the numbers are copied, not re-invented. Only the travel
    distances are rescaled: the donut is r=52 in a 200-unit box, this scoop is

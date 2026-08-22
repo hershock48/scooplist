@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * The TV board: what a shop points its in-store screen at, replacing the
  * rented signage tools. Dark, huge type, grouped by category.
  *
- * A plain meta refresh keeps it current — a TV stick's browser left running
+ * A plain meta refresh keeps it current, a TV stick's browser left running
  * for a week needs the dumbest possible update mechanism, not a websocket.
  */
 export async function generateMetadata(
@@ -74,7 +74,7 @@ export default async function BoardPage({
 
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="font-[family-name:var(--font-display)] text-5xl font-bold">
-          {location.name} — in the case
+          {location.name}, in the case
         </h1>
         <p className="text-lg text-cream/60">{ago(updatedAt)}</p>
       </header>
@@ -106,7 +106,7 @@ export default async function BoardPage({
 
       <footer className="mt-14 flex flex-wrap items-center justify-between gap-3 text-cream/50">
         <p className="text-lg">
-          N nuts · G gluten · E egg · S soy — ask us about anything.
+          N nuts · G gluten · E egg · S soy. Ask us about anything.
         </p>
         {otherShops.length > 0 ? (
           <p className="text-sm">
