@@ -4,7 +4,8 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import SwipeCard from "@/components/SwipeCard";
-import { CATEGORIES, type CategoryKey, type Flavor } from "@/lib/domain";
+import { byCaseOrder, type CaseStatus, type CategoryKey, type Flavor } from "@/lib/domain";
+import type { Category } from "@/lib/vertical";
 import type { ShopLocation } from "@/lib/locations";
 
 /**
@@ -21,12 +22,27 @@ import type { ShopLocation } from "@/lib/locations";
  *    (a ref, synchronous, state is too slow for two taps in one tick), the
  *    401 walk back to /login, and errors rendered INSIDE the open sheet,
  *    because behind the backdrop is where failures go to be missed.
+ *  - Categories arrive as a PROP (env-configured per deployment, vertical.ts),
+ *    never imported: a client bundle cannot read the server's env, so an
+ *    import here would silently show every deployment the ice cream boards.
+ *  - Reordering is arrows in a dedicated mode, not drag. Drag would fight
+ *    the swipe-to-remove gesture for the same touches, and arrows work from
+ *    a keyboard and a screen reader for free. The order is the WALL's order:
+ *    tap seven, third tub from the left.
  */
+
+type CaseEntryLite = {
+  flavorId: string;
+  addedAt: number;
+  position?: number;
+  status?: CaseStatus | null;
+};
 
 type Props = {
   shops: ShopLocation[];
+  categories: Category[];
   flavors: Flavor[];
-  caseByShop: Record<string, { flavorId: string; addedAt: number }[]>;
+  caseByShop: Record<string, CaseEntryLite[]>;
 };
 
 type Sheet =
@@ -36,7 +52,7 @@ type Sheet =
   | { kind: "new"; category?: CategoryKey }
   | null;
 
-export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
+export default function CaseBoard({ shops, categories, flavors, caseByShop }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -45,7 +61,9 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [newName, setNewName] = useState("");
-  const [newCategory, setNewCategory] = useState<CategoryKey>("handscooped");
+  const [newCategory, setNewCategory] = useState<CategoryKey>(categories[0]?.key ?? "");
+  /** Which board is in reorder mode, if any. */
+  const [reordering, setReordering] = useState<string | null>(null);
   /** What just left the board, so the owner can undo the decision to stop there. */
   const [pulled, setPulled] = useState<Flavor | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -55,22 +73,41 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
   const working = busy || pending;
 
   const byId = useMemo(() => new Map(flavors.map((f) => [f.id, f])), [flavors]);
-  const inCaseIds = useMemo(
-    () => new Set((caseByShop[shopId] ?? []).map((e) => e.flavorId)),
-    [caseByShop, shopId],
-  );
+  const entries = useMemo(() => caseByShop[shopId] ?? [], [caseByShop, shopId]);
+  const inCaseIds = useMemo(() => new Set(entries.map((e) => e.flavorId)), [entries]);
+  const entryFor = (flavorId: string) => entries.find((e) => e.flavorId === flavorId);
 
-  /* Every board, always, an empty one still needs its "+" pill. */
+  /* Every board, always, an empty one still needs its "+" pill. On-deck
+     entries live in their own section, not on the customer boards. */
   const boards = useMemo(
     () =>
-      CATEGORIES.map((c) => ({
+      categories.map((c) => ({
         ...c,
-        flavors: (caseByShop[shopId] ?? [])
-          .map((e) => byId.get(e.flavorId))
-          .filter((f): f is Flavor => !!f && !f.retired && f.category === c.key)
-          .sort((a, b) => a.name.localeCompare(b.name)),
+        flavors: entries
+          .filter((e) => e.status !== "ondeck")
+          .map((e) => {
+            const f = byId.get(e.flavorId);
+            return f && !f.retired && f.category === c.key
+              ? { flavor: f, position: e.position, low: e.status === "low", name: f.name }
+              : null;
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null)
+          .sort(byCaseOrder),
       })),
-    [caseByShop, shopId, byId],
+    [categories, entries, byId],
+  );
+
+  const onDeck = useMemo(
+    () =>
+      entries
+        .filter((e) => e.status === "ondeck")
+        .map((e) => {
+          const f = byId.get(e.flavorId);
+          return f && !f.retired ? { flavor: f, position: e.position, name: f.name } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+        .sort(byCaseOrder),
+    [entries, byId],
   );
 
   const inCaseCount = boards.reduce((n, b) => n + b.flavors.length, 0);
@@ -90,10 +127,10 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
   /** Unfiltered, the picker groups by board instead of one long A-Z list. */
   const pickableGroups = useMemo(
     () =>
-      CATEGORIES.map((c) => ({ ...c, items: pickable.filter((f) => f.category === c.key) })).filter(
-        (g) => g.items.length > 0,
-      ),
-    [pickable],
+      categories
+        .map((c) => ({ ...c, items: pickable.filter((f) => f.category === c.key) }))
+        .filter((g) => g.items.length > 0),
+    [categories, pickable],
   );
 
   /* The pulled-flavor note fades on its own; it must never become litter. */
@@ -176,6 +213,39 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
     }
   }
 
+  async function setStatus(flavor: Flavor, status: CaseStatus | null) {
+    const ok = await post("/api/admin/case", {
+      action: "status",
+      locationId: shopId,
+      flavorId: flavor.id,
+      status,
+    });
+    if (ok) {
+      setSheet(null);
+      refresh();
+    }
+  }
+
+  /**
+   * Move one flavor up or down within its board, then write the WHOLE
+   * shop's order (all boards in category order, then on deck): positions
+   * are shop-wide, so writing only one board's slice would let two boards'
+   * numbers interleave unpredictably.
+   */
+  async function move(boardKey: string, index: number, dir: -1 | 1) {
+    const board = boards.find((b) => b.key === boardKey);
+    if (!board) return;
+    const ids = board.flavors.map((x) => x.flavor.id);
+    const j = index + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[index], ids[j]] = [ids[j], ids[index]];
+    const full = boards
+      .flatMap((b) => (b.key === boardKey ? ids : b.flavors.map((x) => x.flavor.id)))
+      .concat(onDeck.map((x) => x.flavor.id));
+    const ok = await post("/api/admin/case", { action: "reorder", locationId: shopId, flavorIds: full });
+    if (ok) refresh();
+  }
+
   async function createAndAdd(category: CategoryKey) {
     const name = newName.trim();
     if (!name || working) return;
@@ -195,6 +265,8 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
     </p>
   ) : null;
 
+  const sheetEntry = sheet?.kind === "flavor" ? entryFor(sheet.flavor.id) : undefined;
+
   return (
     <div aria-busy={working}>
       <div role="tablist" aria-label="Shop" className="mt-5 flex gap-2">
@@ -203,7 +275,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
             key={s.id}
             role="tab"
             aria-selected={shopId === s.id}
-            onClick={() => setShopId(s.id)}
+            onClick={() => { setShopId(s.id); setReordering(null); }}
             className={`min-h-12 flex-1 rounded-full px-4 font-semibold transition-colors ${
               shopId === s.id ? "bg-berry text-cream" : "bg-cream-dim text-ink hover:bg-berry/15"
             }`}
@@ -239,20 +311,64 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                 {b.flavors.length ? `${b.flavors.length} in the case` : "empty"}
               </span>
             </h2>
-            {/* The board's own door: opens the picker already filtered to it. */}
-            <button
-              onClick={() => { openSheet({ kind: "picker", category: b.key }); setSearch(""); }}
-              aria-label={`Add a ${b.label} flavor to ${shopName}`}
-              className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-full bg-berry px-4 font-semibold text-cream transition-colors hover:bg-berry-bright"
-            >
-              <span aria-hidden className="text-lg leading-none">+</span>
-              Add
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {b.flavors.length > 1 ? (
+                <button
+                  onClick={() => setReordering((cur) => (cur === b.key ? null : b.key))}
+                  aria-pressed={reordering === b.key}
+                  className="min-h-10 rounded-full px-3 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline"
+                >
+                  {reordering === b.key ? "Done" : "Reorder"}
+                </button>
+              ) : null}
+              {/* The board's own door: opens the picker already filtered to it. */}
+              <button
+                onClick={() => { openSheet({ kind: "picker", category: b.key }); setSearch(""); }}
+                aria-label={`Add a ${b.label} flavor to ${shopName}`}
+                className="inline-flex min-h-10 items-center gap-1 rounded-full bg-berry px-4 font-semibold text-cream transition-colors hover:bg-berry-bright"
+              >
+                <span aria-hidden className="text-lg leading-none">+</span>
+                Add
+              </button>
+            </div>
           </div>
 
-          {b.flavors.length > 0 ? (
+          {reordering === b.key ? (
+            /* Match the wall: the list IS the case, top to bottom. */
+            <ul className="mt-3 grid gap-2">
+              {b.flavors.map((x, i) => (
+                <li
+                  key={x.flavor.id}
+                  className="card flex items-center justify-between gap-3 px-4 py-2.5"
+                >
+                  <span className="font-semibold">
+                    <span className="mr-2 text-sm font-normal text-ink-soft">{i + 1}.</span>
+                    {x.flavor.name}
+                  </span>
+                  <span className="flex gap-1">
+                    <button
+                      onClick={() => move(b.key, i, -1)}
+                      disabled={working || i === 0}
+                      aria-label={`Move ${x.flavor.name} up`}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-cream-dim text-lg font-semibold disabled:opacity-40"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => move(b.key, i, 1)}
+                      disabled={working || i === b.flavors.length - 1}
+                      aria-label={`Move ${x.flavor.name} down`}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-cream-dim text-lg font-semibold disabled:opacity-40"
+                    >
+                      ↓
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : b.flavors.length > 0 ? (
             <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {b.flavors.map((f) => (
+              {b.flavors.map(({ flavor: f, low }) => (
                 <li key={f.id}>
                   <SwipeCard
                     label={`${f.name}, tap for details, swipe left to take off the board`}
@@ -273,6 +389,11 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                     )}
                     <span className="block px-3 py-2.5">
                       <span className="block font-semibold leading-snug">{f.name}</span>
+                      {low ? (
+                        <span className="mt-1 block text-xs font-semibold uppercase tracking-wide text-berry">
+                          running low
+                        </span>
+                      ) : null}
                       {f.allergens.length > 0 ? (
                         <span className="mt-1 block text-xs uppercase tracking-wide text-ink-soft">
                           {f.allergens.join(" · ")}
@@ -290,6 +411,45 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
           )}
         </section>
       ))}
+
+      {onDeck.length > 0 ? (
+        <section aria-labelledby="case-ondeck" className="mt-8 rounded-[--radius-panel] bg-cream-dim p-4">
+          <h2 id="case-ondeck" className="font-[family-name:var(--font-display)] text-xl font-semibold">
+            On deck
+            <span className="ml-2 text-sm font-normal text-ink-soft">{onDeck.length}</span>
+          </h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Queued to go on next. Customers can see these are coming; they are
+            not on the boards yet.
+          </p>
+          <ul className="mt-3 grid gap-2">
+            {onDeck.map(({ flavor: f }) => (
+              <li
+                key={f.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-[--radius-card] bg-white px-4 py-3"
+              >
+                <span className="font-semibold">{f.name}</span>
+                <span className="flex gap-2">
+                  <button
+                    onClick={() => setStatus(f, null)}
+                    disabled={working}
+                    className="btn !min-h-11 !px-4 !py-2 text-sm disabled:opacity-60"
+                  >
+                    Start scooping it
+                  </button>
+                  <button
+                    onClick={() => markOut(f)}
+                    disabled={working}
+                    className="min-h-11 px-2 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline"
+                  >
+                    Remove
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/* What just happened, with the optional next step - not a sheet. */}
       {pulled ? (
@@ -394,7 +554,9 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                   {sheet.flavor.name}
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">
-                  In the {shopName} case.{" "}
+                  {sheetEntry?.status === "low"
+                    ? `Running low in the ${shopName} case.`
+                    : `In the ${shopName} case.`}{" "}
                   {sheet.flavor.sizes.map((s) => `${s.label} ${s.price}`).join(" · ")}
                 </p>
                 <div className="mt-5 grid gap-3">
@@ -404,7 +566,23 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                   >
                     Tub&apos;s empty, take it off the board
                   </button>
-                  <button onClick={() => setSheet(null)} className="btn-ghost w-full">
+                  {/* Last call: the state between full and blown. The board
+                      and the website both say so the moment it flips. */}
+                  <button
+                    onClick={() => setStatus(sheet.flavor, sheetEntry?.status === "low" ? null : "low")}
+                    className="btn-ghost w-full disabled:opacity-60"
+                    disabled={working}
+                  >
+                    {sheetEntry?.status === "low" ? "Back to full, all good" : "Running low, last call"}
+                  </button>
+                  <button
+                    onClick={() => setStatus(sheet.flavor, "ondeck")}
+                    className="btn-ghost w-full disabled:opacity-60"
+                    disabled={working}
+                  >
+                    Move to on deck
+                  </button>
+                  <button onClick={() => setSheet(null)} className="min-h-12 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline">
                     Never mind
                   </button>
                 </div>
@@ -413,7 +591,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
               <>
                 <h3 className="-mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold">
                   {sheet.category
-                    ? `Add ${CATEGORIES.find((c) => c.key === sheet.category)?.label} at ${shopName}`
+                    ? `Add ${categories.find((c) => c.key === sheet.category)?.label} at ${shopName}`
                     : `What's going in at ${shopName}?`}
                 </h3>
                 <input
@@ -455,7 +633,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                 <div className="mt-4 grid gap-2">
                   <button
                     onClick={() => {
-                      setNewCategory(sheet.category ?? "handscooped");
+                      setNewCategory(sheet.category ?? categories[0]?.key ?? "");
                       setSheet({ kind: "new", category: sheet.category });
                     }}
                     className="btn-ghost w-full"
@@ -486,7 +664,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                   autoFocus
                 />
                 <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Board">
-                  {CATEGORIES.map((c) => (
+                  {categories.map((c) => (
                     <button
                       key={c.key}
                       role="radio"

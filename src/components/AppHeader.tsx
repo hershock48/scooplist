@@ -23,7 +23,7 @@ export default function AppHeader({
   current,
   boardHref,
 }: {
-  current: "case" | "library";
+  current: "case" | "library" | "history";
   boardHref: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -46,11 +46,14 @@ export default function AppHeader({
   const items: Item[] = [
     { href: "/case", label: "The case" },
     { href: "/flavors", label: "Library" },
+    { href: "/history", label: "History" },
     { href: boardHref, label: "TV board ↗", external: true },
   ];
 
   const isCurrent = (href: string) =>
-    (current === "case" && href === "/case") || (current === "library" && href === "/flavors");
+    (current === "case" && href === "/case") ||
+    (current === "library" && href === "/flavors") ||
+    (current === "history" && href === "/history");
 
   const signOut = (
     <form method="post" action="/api/logout">

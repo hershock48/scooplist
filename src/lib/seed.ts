@@ -1,6 +1,7 @@
 import "server-only";
 
-import { DEFAULT_SIZES, newId, type Allergen, type CategoryKey, type Flavor } from "@/lib/domain";
+import { newId, type Allergen, type CategoryKey, type Flavor } from "@/lib/domain";
+import { defaultSizesFor } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 import { locations } from "@/lib/locations";
 
@@ -11,14 +12,23 @@ import { locations } from "@/lib/locations";
  * touched. Soft serve lands only in Marshall's case, the machine is theirs.
  */
 
-type SeedRow = [name: string, category: CategoryKey, allergens?: Allergen[], description?: string];
+type SeedRow = [
+  name: string,
+  category: CategoryKey,
+  allergens?: Allergen[],
+  description?: string,
+  producer?: string,
+];
 
 const SEED: SeedRow[] = [
   ["Birthday Cake", "handscooped"],
   ["Biscoff Cookie Butter", "handscooped", ["gluten"]],
   ["Blue Moon", "handscooped"],
   ["Butter Pecan", "handscooped", ["nuts"]],
-  ["Cascarelli Cashew", "handscooped", ["nuts"], "Made with the famous nuts from Cascarelli's of Homer."],
+  // Collaborators are STRUCTURED (producer), not buried in the prose where
+  // nothing can style, filter, link, or count them. The description still
+  // reads well on its own; the field is what the boards and feeds use.
+  ["Cascarelli Cashew", "handscooped", ["nuts"], "Made with the famous nuts from Cascarelli's of Homer.", "Cascarelli's of Homer"],
   ["Chocolate", "handscooped"],
   ["Chocolate Avalanche", "handscooped", ["gluten"]],
   ["Cookie Dough", "handscooped", ["gluten"]],
@@ -26,7 +36,7 @@ const SEED: SeedRow[] = [
   ["Dark Cherry Chip", "handscooped"],
   ["Lemon", "handscooped"],
   ["Mint Chip", "handscooped"],
-  ["Old Pan Toffee", "handscooped", ["nuts"], "A collaboration with Old Pan Toffee, made down the road."],
+  ["Old Pan Toffee", "handscooped", ["nuts"], "A collaboration with Old Pan Toffee, made down the road.", "Old Pan Toffee"],
   ["Oreo", "handscooped", ["gluten"]],
   ["Peanut Butter Cup", "handscooped", ["nuts"]],
   ["Raspberry Chip", "handscooped"],
@@ -67,6 +77,18 @@ export async function seedIfEmpty(): Promise<void> {
   const g = globalThis as typeof globalThis & { __scooplistSeeded?: boolean };
   if (g.__scooplistSeeded) return;
 
+  /*
+    The seed is True North's ICE CREAM board, demo data for the default
+    vertical only. A deployment that has configured its own categories (a
+    tap list) must start empty: forty ice cream flavors whose categories
+    match none of its boards would be invisible on every screen and still
+    pollute the library and the picker.
+  */
+  if (process.env.SCOOPLIST_CATEGORIES) {
+    g.__scooplistSeeded = true;
+    return;
+  }
+
   const store = getStore();
   if (await store.hasAnyFlavors()) {
     g.__scooplistSeeded = true;
@@ -86,7 +108,7 @@ async function seed(): Promise<void> {
   const shops = locations();
   const ids: { id: string; category: CategoryKey }[] = [];
 
-  for (const [name, category, allergens, description] of SEED) {
+  for (const [name, category, allergens, description, producer] of SEED) {
     const flavor: Flavor = {
       id: newId("flv"),
       name,
@@ -94,8 +116,9 @@ async function seed(): Promise<void> {
       category,
       allergens: allergens ?? [],
       tags: category === "dairyfree" ? ["dairy free"] : [],
+      producer: producer ?? "",
       photoUrl: "",
-      sizes: DEFAULT_SIZES[category],
+      sizes: defaultSizesFor(category),
       retired: false,
       createdAt: now,
     };

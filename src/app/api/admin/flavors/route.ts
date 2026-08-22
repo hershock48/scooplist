@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
-import {
-  ALLERGENS,
-  CATEGORIES,
-  DEFAULT_SIZES,
-  newId,
-  type Allergen,
-  type CategoryKey,
-  type Flavor,
-  type Size,
-} from "@/lib/domain";
+import { newId, type Allergen, type CategoryKey, type Flavor, type Size } from "@/lib/domain";
+import { allergens as configuredAllergens, categories, defaultSizesFor } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -82,17 +74,25 @@ export async function POST(request: Request) {
     photoUrl = b.photoUrl.trim();
   }
 
-  const category = (CATEGORIES.some((c) => c.key === b.category)
+  // Validated against the CONFIGURED vertical, not a hardcoded ice cream
+  // list; the deployment's env decides what a legal category or allergen is.
+  const cats = categories();
+  const category = (cats.some((c) => c.key === b.category)
     ? (b.category as CategoryKey)
-    : existing?.category) ?? "handscooped";
+    : existing?.category) ?? cats[0].key;
 
+  const legalAllergens = configuredAllergens();
   const allergens = Array.isArray(b.allergens)
-    ? (b.allergens.filter((a) => (ALLERGENS as readonly string[]).includes(String(a))) as Allergen[])
+    ? (b.allergens.filter((a) => legalAllergens.includes(String(a))) as Allergen[])
     : existing?.allergens ?? [];
 
   const tags = Array.isArray(b.tags)
     ? b.tags.map((t) => clean(t, 30)).filter(Boolean).slice(0, 8)
     : existing?.tags ?? [];
+
+  // ABV keeps only what a number needs; "5.2%" typed with the sign is fine.
+  const abv =
+    b.abv !== undefined ? clean(b.abv, 10).replace(/[^\d.]/g, "") : existing?.abv ?? "";
 
   const flavor: Flavor = {
     id: existing?.id ?? newId("flv"),
@@ -101,8 +101,10 @@ export async function POST(request: Request) {
     category,
     allergens,
     tags,
+    producer: b.producer !== undefined ? clean(b.producer, 80) : existing?.producer ?? "",
+    abv,
     photoUrl,
-    sizes: cleanSizes(b.sizes) ?? existing?.sizes ?? DEFAULT_SIZES[category],
+    sizes: cleanSizes(b.sizes) ?? existing?.sizes ?? defaultSizesFor(category),
     sizesByShop: cleanShopSizes(b.sizesByShop) ?? existing?.sizesByShop,
     retired: typeof b.retired === "boolean" ? b.retired : existing?.retired ?? false,
     /*

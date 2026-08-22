@@ -31,13 +31,28 @@ authority on the real configuration.
 ## Surfaces
 
 - `/case`, the owner's screen, PIN-gated, phone-first. Shop tabs, the case
-  grouped by board, two-tap out, picker-with-inline-new for in.
-- `/flavors`, the library. Story, allergens, prices by size, photo upload
-  (browser resizes to ≤900px JPEG before sending), retire/bring back.
+  grouped by board, two-tap out, picker-with-inline-new for in, per-board
+  reorder (arrows, not drag: drag fights the swipe gesture and arrows work
+  from a keyboard), and two in-between states: "running low" (last call on
+  every screen) and "on deck" (queued, visible as coming, not on the boards).
+- `/flavors`, the library. Story, maker/collaborator, ABV, allergens, prices
+  by size, photo upload (browser resizes to ≤900px JPEG before sending),
+  retire/bring back.
+- `/history`, PIN-gated. What the closed case entries have been recording
+  all along: runs, days on the board, share of the last 90 days, per shop.
+  Also the export link.
 - `/board/{location}`, public TV board. Dark, huge type, meta-refresh every
   60s: the dumbest reliable update for a TV stick left running all week.
+  A store error degrades to a calm "back in a moment" with the refresh
+  still armed, never an error page on a screen customers watch; and once
+  every six hours the refresh is a hard reload, so a wedged TV stick
+  recovers by itself.
 - `GET /api/v1/case/{location}`, **the feed.** Public JSON, open CORS,
   `s-maxage=30, stale-while-revalidate`. This is what client sites consume.
+  v1 additions (existing consumers unaffected): `producer`, `abv`, `low`,
+  `position` on each flavor, and a top-level `onDeck` list.
+- `GET /api/admin/export`, PIN-gated. The whole library and every case
+  entry ever, one JSON file: the backup path and the ownership promise.
 
 ## Decisions, with reasoning
 
@@ -71,6 +86,19 @@ authority on the real configuration.
   next client is a dashboard edit. Multi-tenant (accounts table, per-shop
   PINs, a signup) is deliberately NOT built, single-tenant per deployment
   until a second client proves the shape, the DeVine gating rule.
+- **The vertical is env config too** (`SCOOPLIST_CATEGORIES`,
+  `SCOOPLIST_ALLERGENS`, `SCOOPLIST_SIZES`, see `.env.example` and
+  `src/lib/vertical.ts`): categories, allergen chips, and default price
+  lists follow the locations pattern, defaulting to exactly the ice cream
+  values that used to be hardcoded. A tavern's tap list (Cascarelli's, the
+  prompt for this) is a dashboard edit, not a fork. Client components get
+  these as props, never by import: a client bundle cannot read server env.
+- **Only admin surfaces seed.** The public feed and TV board used to call
+  `seedIfEmpty()`, which meant a stranger's GET performed the first write
+  on a fresh database. Now an empty library returns an empty board there,
+  and the seed runs where a new operator actually lands (`/case`,
+  `/flavors`). On the no-database demo, that also means: open `/case`
+  once before showing the feed or board, memory is per-instance.
 - **The feed is versioned (`/api/v1/`)** because client sites will depend on
   it; breaking it breaks live menus. Additive changes only; a break means v2.
 
@@ -83,13 +111,18 @@ integration.
 
 ## Before this is a product
 
-- [ ] Set `SCOOPLIST_PIN`, `SCOOPLIST_SECRET`, `DATABASE_URL` (Neon), and
-      `BLOB_READ_WRITE_TOKEN` in Vercel
+- [x] Set `SCOOPLIST_PIN`, `SCOOPLIST_SECRET`, `DATABASE_URL` (Neon), and
+      `BLOB_READ_WRITE_TOKEN` in Vercel, verified via `/api/status`
+      (all true, `vercelEnv: production`), August 2026
 - [ ] Remove the noindex in `next.config.ts` when it gets a real domain
-- [x] Wire truenorth's flavor board to the feed, done, `truenorth/src/data/
-      liveCase.ts` (env-flagged via SCOOPLIST_FEED_URL, static fallback);
-      set the env on the truenorth Vercel project once this app is public
-- [ ] Case history view ("what left the case, when"), the data is already kept
-- [ ] Second tenant → extract multi-tenancy, not before
+- [x] Wire truenorth's flavor board to the feed, done end to end:
+      `truenorth/src/data/liveCase.ts` + `SCOOPLIST_FEED_URL` set on the
+      truenorth Vercel project, verified via truenorth's `/api/status`
+      ("Live: the boards render from Scooplist"), August 2026
+- [x] Case history view, `/history`, August 2026
+- [x] Export, `/api/admin/export`, August 2026
+- [ ] Second tenant → extract multi-tenancy, not before. (Cascarelli's as a
+      tap list is a SECOND DEPLOYMENT, which the env vars now cover; it is
+      deliberately not a reason to build accounts, see glaze/catalog.)
 - [ ] QR counter menu page (the feed + a template; an evening)
 - [ ] "Tell me when it's back", customer flavor alerts; the Untappd hook

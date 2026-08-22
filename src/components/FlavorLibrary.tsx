@@ -4,8 +4,6 @@ import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ALLERGENS,
-  CATEGORIES,
   RETIRE_GRACE_MS,
   hasShopPricing,
   recentlyRetired,
@@ -14,6 +12,7 @@ import {
   type Flavor,
   type Size,
 } from "@/lib/domain";
+import type { Category } from "@/lib/vertical";
 import type { ShopLocation } from "@/lib/locations";
 
 /**
@@ -25,7 +24,18 @@ import type { ShopLocation } from "@/lib/locations";
  * retired flavor keeps its history and can come back next summer.
  */
 
-type Props = { flavors: Flavor[]; shops: ShopLocation[]; inCase: Record<string, string[]> };
+/**
+ * Categories and allergens arrive as PROPS (env-configured per deployment,
+ * vertical.ts), never imported: a client bundle cannot read the server's
+ * env, so importing the lists here would show every deployment ice cream.
+ */
+type Props = {
+  flavors: Flavor[];
+  shops: ShopLocation[];
+  categories: Category[];
+  allergenOptions: string[];
+  inCase: Record<string, string[]>;
+};
 
 /** Downscale to <=900px JPEG so uploads are ~100KB, not a camera original. */
 async function resizeToJpeg(file: File): Promise<{ data: string; contentType: string }> {
@@ -49,7 +59,7 @@ async function resizeToJpeg(file: File): Promise<{ data: string; contentType: st
   }
 }
 
-export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
+export default function FlavorLibrary({ flavors, shops, categories, allergenOptions, inCase }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -60,7 +70,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
   /** Positive confirmation. A save that only flashes is a save you distrust. */
   const [saved, setSaved] = useState("");
   const [newName, setNewName] = useState("");
-  const [newCategory, setNewCategory] = useState<CategoryKey>("handscooped");
+  const [newCategory, setNewCategory] = useState<CategoryKey>(categories[0]?.key ?? "");
   /** The open editor sets this; collapsing a dirty editor asks first. */
   const dirtyRef = useRef(false);
   /** Synchronous double-tap latch, `busy` state is async and misses same-tick taps. */
@@ -106,7 +116,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
 
   const groups = useMemo(
     () =>
-      CATEGORIES.map((c) => ({
+      categories.map((c) => ({
         ...c,
         items: visible
           .filter((f) => f.category === c.key && !homeIds.has(f.id))
@@ -116,7 +126,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
             return outA - outB || a.name.localeCompare(b.name);
           }),
       })).filter((g) => g.items.length > 0),
-    [visible, inCase, homeIds],
+    [categories, visible, inCase, homeIds],
   );
 
   async function save(patch: Record<string, unknown>, note = "Saved"): Promise<Flavor | null> {
@@ -197,7 +207,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
             aria-label="Board"
             className="field max-w-52"
           >
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c.key} value={c.key}>
                 {c.label}
               </option>
@@ -295,6 +305,8 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
                       save={save}
                       setError={setError}
                       shops={shops}
+                      categories={categories}
+                      allergenOptions={allergenOptions}
                       markDirty={() => (dirtyRef.current = true)}
                       working={working}
                     />
@@ -332,7 +344,7 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
                 <span>
                   <span className="block font-semibold text-ink-soft line-through">{f.name}</span>
                   <span className="block text-xs text-ink-soft">
-                    {CATEGORIES.find((c) => c.key === f.category)?.label} ·{" "}
+                    {categories.find((c) => c.key === f.category)?.label ?? f.category} ·{" "}
                     {hoursLeft(f.retiredAt)}
                   </span>
                 </span>
@@ -368,11 +380,15 @@ function FlavorEditor({
   save,
   setError,
   shops,
+  categories,
+  allergenOptions,
   markDirty,
   working,
 }: {
   flavor: Flavor;
   shops: ShopLocation[];
+  categories: Category[];
+  allergenOptions: string[];
   save: (patch: Record<string, unknown>, note?: string) => Promise<Flavor | null>;
   setError: (e: string) => void;
   markDirty: () => void;
@@ -382,6 +398,8 @@ function FlavorEditor({
   const [description, setDescription] = useState(flavor.description);
   const [category, setCategory] = useState<CategoryKey>(flavor.category);
   const [allergens, setAllergens] = useState<Allergen[]>(flavor.allergens);
+  const [producer, setProducer] = useState(flavor.producer ?? "");
+  const [abv, setAbv] = useState(flavor.abv ?? "");
   const [sizes, setSizes] = useState<Size[]>(flavor.sizes);
   /*
     Per-shop prices stay collapsed unless this flavor already has them: most
@@ -436,6 +454,8 @@ function FlavorEditor({
         description,
         category,
         allergens,
+        producer,
+        abv,
         sizes: sizes.filter((s) => s.label.trim() && s.price.trim()),
         // Off means "every shop uses the default", an empty object clears it.
         sizesByShop: perShop
@@ -501,12 +521,40 @@ function FlavorEditor({
             onChange={(e) => { touch(); setCategory(e.target.value as CategoryKey); }}
             className="field mt-1 font-normal"
           >
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c.key} value={c.key}>
                 {c.label}
               </option>
             ))}
           </select>
+        </label>
+      </div>
+
+      {/*
+        The collaborator gets a FIELD, not a sentence. The seed proved the
+        need twice before beer did: Cascarelli Cashew's maker was buried in
+        prose where nothing could style, filter, or link it. ABV rides along
+        for the drinks verticals; blank means it never renders anywhere.
+      */}
+      <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_8rem]">
+        <label className="block text-sm font-semibold">
+          Made by / with <span className="font-normal text-ink-soft">(if not the shop)</span>
+          <input
+            value={producer}
+            onChange={(e) => { touch(); setProducer(e.target.value); }}
+            className="field mt-1 font-normal"
+            placeholder="Cascarelli's of Homer"
+          />
+        </label>
+        <label className="block text-sm font-semibold">
+          ABV %
+          <input
+            value={abv}
+            onChange={(e) => { touch(); setAbv(e.target.value); }}
+            className="field mt-1 font-normal"
+            placeholder="5.2"
+            inputMode="decimal"
+          />
         </label>
       </div>
 
@@ -521,10 +569,11 @@ function FlavorEditor({
         />
       </label>
 
+      {allergenOptions.length > 0 ? (
       <fieldset className="mt-4">
         <legend className="text-sm font-semibold">Allergens</legend>
         <div className="mt-2 flex flex-wrap gap-2">
-          {ALLERGENS.map((a) => (
+          {allergenOptions.map((a) => (
             <button
               key={a}
               type="button"
@@ -539,6 +588,7 @@ function FlavorEditor({
           ))}
         </div>
       </fieldset>
+      ) : null}
 
       <fieldset className="mt-4">
         <legend className="text-sm font-semibold">Prices by size</legend>

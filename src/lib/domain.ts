@@ -1,20 +1,17 @@
 /**
- * The domain, client-safe: types and constants both the browser UI and the
- * server store speak. No imports, no server-only, store.ts layers the
- * database on top of this, never the other way around.
+ * The domain, client-safe: types and helpers both the browser UI and the
+ * server store speak. No imports beyond types, no server-only, store.ts
+ * layers the database on top of this, never the other way around.
+ *
+ * The category and allergen LISTS used to live here as frozen ice cream
+ * constants. They moved to vertical.ts (server-side, env-configured, ice
+ * cream by default) the day a second vertical appeared, and the client
+ * components now receive them as props. Keys are plain strings for the
+ * same reason locations are: the set is deployment config, not code.
  */
 
-export const CATEGORIES = [
-  { key: "handscooped", label: "Hand-Scooped" },
-  { key: "softserve", label: "Soft Serve" },
-  { key: "dairyfree", label: "Dairy Free & Sorbet" },
-  { key: "adult", label: "Adult Flavors (21+)" },
-] as const;
-
-export type CategoryKey = (typeof CATEGORIES)[number]["key"];
-
-export const ALLERGENS = ["nuts", "gluten", "egg", "soy"] as const;
-export type Allergen = (typeof ALLERGENS)[number];
+export type CategoryKey = string;
+export type Allergen = string;
 
 export type Size = { label: string; price: string };
 
@@ -29,6 +26,21 @@ export type Flavor = {
   allergens: Allergen[];
   /** Free labels the shop cares about: vegan, seasonal, new, collaboration… */
   tags: string[];
+  /**
+   * Who made it, when that is not the shop itself. Ice cream wanted this
+   * before beer did: the seed's own "Cascarelli Cashew" buried its
+   * collaborator in prose where nothing could style, filter, or count it.
+   * For a tap list it stops being optional, a board without the brewery
+   * is not a tap list.
+   */
+  producer?: string;
+  /**
+   * ABV as entered ("5.2"), only meaningful for the drinks verticals and
+   * blank everywhere else. A single named field, deliberately not a
+   * generic attribute bag: a bag makes every screen mushier, and a third
+   * vertical can pay for the generalization when it actually asks.
+   */
+  abv?: string;
   /** Blob URL in production; a data: URL on the no-Blob demo path. */
   photoUrl: string;
   /**
@@ -63,6 +75,14 @@ export type Flavor = {
   createdAt: number;
 };
 
+/**
+ * The two in-between states a live case actually has, besides "scooping"
+ * and "gone": LOW is the last-call flag (the interesting moment between
+ * full and blown), ONDECK is queued to go on next, in the system but not
+ * yet on the customer boards. Absent = scooping normally.
+ */
+export type CaseStatus = "low" | "ondeck";
+
 export type CaseEntry = {
   id: string;
   locationId: string;
@@ -70,30 +90,15 @@ export type CaseEntry = {
   addedAt: number;
   /** null = in the case right now. Set when the tub blows. */
   removedAt: number | null;
-};
-
-/** Sensible starting prices per category, True North's published menu. */
-export const DEFAULT_SIZES: Record<CategoryKey, Size[]> = {
-  handscooped: [
-    { label: "Mini", price: "$4.75" },
-    { label: "Small", price: "$5.75" },
-    { label: "Large", price: "$6.75" },
-  ],
-  softserve: [
-    { label: "Mini", price: "$3.75" },
-    { label: "Small", price: "$4.75" },
-    { label: "Large", price: "$5.75" },
-  ],
-  dairyfree: [
-    { label: "Mini", price: "$4.75" },
-    { label: "Small", price: "$5.75" },
-    { label: "Large", price: "$6.75" },
-  ],
-  adult: [
-    { label: "Mini", price: "$5.75" },
-    { label: "Small", price: "$6.75" },
-    { label: "Large", price: "$7.75" },
-  ],
+  /**
+   * Physical order, the thing localeCompare threw away: real cases and tap
+   * walls have positions ("tap seven blew", "third tub from the left") and
+   * the TV board should match the wall. Entries without one sort after
+   * positioned ones, in the old alphabetical order, so nothing moves until
+   * an owner actually reorders.
+   */
+  position?: number;
+  status?: CaseStatus | null;
 };
 
 /** What this flavor costs at this shop: its override, else the default. */
@@ -112,6 +117,17 @@ export const RETIRE_GRACE_MS = 24 * 60 * 60 * 1000;
 
 export function recentlyRetired(flavor: Flavor, now = Date.now()): boolean {
   return Boolean(flavor.retired && flavor.retiredAt && now - flavor.retiredAt < RETIRE_GRACE_MS);
+}
+
+/**
+ * Case order: position first (the wall), then the pre-position alphabetical
+ * fallback. One comparator shared by the feed, the TV board, and the admin
+ * so "the board matches the wall" is true everywhere at once.
+ */
+export function byCaseOrder<T extends { position?: number | null; name: string }>(a: T, b: T): number {
+  const pa = a.position ?? Number.MAX_SAFE_INTEGER;
+  const pb = b.position ?? Number.MAX_SAFE_INTEGER;
+  return pa - pb || a.name.localeCompare(b.name);
 }
 
 export function newId(prefix: string): string {

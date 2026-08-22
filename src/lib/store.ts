@@ -41,6 +41,12 @@ type Store = {
   /** Open entries for one shop, oldest first (the order the case was built). */
   listCase(locationId: string): Promise<CaseEntry[]>;
   /**
+   * EVERY entry, open and closed, the history nothing used to read. This is
+   * the analytics ("Mint Chip lasted four days") and the export. Newest
+   * first, capped generously; the cap is logged if it ever trims.
+   */
+  listEntries(): Promise<CaseEntry[]>;
+  /**
    * IDEMPOTENT: a flavor already open at this shop is not added twice. The
    * guard lives here (unique partial index / in-store check), not in the API
    * route, a check-then-insert in the route is a race two double-tap POSTs
@@ -49,6 +55,10 @@ type Store = {
   addToCase(e: CaseEntry): Promise<void>;
   /** Close the OPEN entry for this flavor at this shop. No-op if none. */
   closeCaseEntry(locationId: string, flavorId: string, removedAt: number): Promise<void>;
+  /** Set/clear the open entry's status: "low", "ondeck", or null = scooping. */
+  setCaseStatus(locationId: string, flavorId: string, status: "low" | "ondeck" | null): Promise<void>;
+  /** Overwrite positions for a shop's open entries, in the order given. */
+  reorderCase(locationId: string, flavorIds: string[]): Promise<void>;
   /** When anything about a shop's case last changed, for "updated x ago". */
   caseUpdatedAt(locationId: string): Promise<number | null>;
   /**
@@ -93,6 +103,9 @@ const memoryStore: Store = {
       .filter((e) => e.locationId === locationId && e.removedAt === null)
       .sort((a, b) => a.addedAt - b.addedAt);
   },
+  async listEntries() {
+    return [...bag().entries.values()].sort((a, b) => b.addedAt - a.addedAt);
+  },
   async addToCase(e) {
     const open = [...bag().entries.values()].some(
       (x) => x.locationId === e.locationId && x.flavorId === e.flavorId && x.removedAt === null,
@@ -103,6 +116,21 @@ const memoryStore: Store = {
     for (const e of bag().entries.values()) {
       if (e.locationId === locationId && e.flavorId === flavorId && e.removedAt === null) {
         e.removedAt = removedAt;
+      }
+    }
+  },
+  async setCaseStatus(locationId, flavorId, status) {
+    for (const e of bag().entries.values()) {
+      if (e.locationId === locationId && e.flavorId === flavorId && e.removedAt === null) {
+        e.status = status;
+      }
+    }
+  },
+  async reorderCase(locationId, flavorIds) {
+    const order = new Map(flavorIds.map((id, i) => [id, i]));
+    for (const e of bag().entries.values()) {
+      if (e.locationId === locationId && e.removedAt === null && order.has(e.flavorId)) {
+        e.position = order.get(e.flavorId);
       }
     }
   },
@@ -197,12 +225,33 @@ const postgresStore: Store = {
   },
   async listCase(locationId) {
     const pool = await pgPool();
+    /*
+      Fetch one PAST the cap so truncation is detectable. No real case has
+      500 open entries (twenty taps, forty tubs), so hitting this means
+      something is wrong upstream, and a silent trim would make the board
+      quietly lie about it.
+    */
     const r = await pool.query(
       `SELECT data FROM scooplist_case
        WHERE location_id = $1 AND removed_at IS NULL
-       ORDER BY added_at ASC LIMIT 500`,
+       ORDER BY added_at ASC LIMIT 501`,
       [locationId],
     );
+    if (r.rows.length > 500) {
+      console.warn(`scooplist: case for ${locationId} exceeds 500 open entries, list truncated`);
+      r.rows.length = 500;
+    }
+    return r.rows.map((row) => row.data as CaseEntry);
+  },
+  async listEntries() {
+    const pool = await pgPool();
+    const r = await pool.query(
+      `SELECT data FROM scooplist_case ORDER BY added_at DESC LIMIT 20001`,
+    );
+    if (r.rows.length > 20000) {
+      console.warn("scooplist: history exceeds 20000 entries, list truncated");
+      r.rows.length = 20000;
+    }
     return r.rows.map((row) => row.data as CaseEntry);
   },
   async addToCase(e) {
@@ -222,6 +271,30 @@ const postgresStore: Store = {
        WHERE location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
       [locationId, flavorId, removedAt],
     );
+  },
+  async setCaseStatus(locationId, flavorId, status) {
+    const pool = await pgPool();
+    // null clears the key entirely so the blob stays as small as it started.
+    await pool.query(
+      status === null
+        ? `UPDATE scooplist_case SET data = data - 'status'
+           WHERE location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`
+        : `UPDATE scooplist_case SET data = data || jsonb_build_object('status', $3::text)
+           WHERE location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
+      status === null ? [locationId, flavorId] : [locationId, flavorId, status],
+    );
+  },
+  async reorderCase(locationId, flavorIds) {
+    const pool = await pgPool();
+    // A handful of rows at most; one statement per row is simpler than a
+    // jsonb VALUES join and impossible to get subtly wrong.
+    for (let i = 0; i < flavorIds.length; i++) {
+      await pool.query(
+        `UPDATE scooplist_case SET data = data || jsonb_build_object('position', $3::int)
+         WHERE location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
+        [locationId, flavorIds[i], i],
+      );
+    }
   },
   async caseUpdatedAt(locationId) {
     const pool = await pgPool();

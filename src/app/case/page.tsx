@@ -4,8 +4,10 @@ import CaseBoard from "@/components/CaseBoard";
 import AppHeader from "@/components/AppHeader";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
+import { categories } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
+import type { CaseStatus } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "The case" };
@@ -17,11 +19,16 @@ export default async function CasePage() {
   const store = getStore();
   const shops = locations();
   const flavors = await store.listFlavors();
-  const caseByShop: Record<string, { flavorId: string; addedAt: number }[]> = {};
+  const caseByShop: Record<
+    string,
+    { flavorId: string; addedAt: number; position?: number; status?: CaseStatus | null }[]
+  > = {};
   for (const shop of shops) {
     caseByShop[shop.id] = (await store.listCase(shop.id)).map((e) => ({
       flavorId: e.flavorId,
       addedAt: e.addedAt,
+      position: e.position,
+      status: e.status,
     }));
   }
 
@@ -38,7 +45,7 @@ export default async function CasePage() {
         </p>
       ) : null}
 
-      <CaseBoard shops={shops} flavors={flavors} caseByShop={caseByShop} />
+      <CaseBoard shops={shops} categories={categories()} flavors={flavors} caseByShop={caseByShop} />
     </main>
   );
 }
