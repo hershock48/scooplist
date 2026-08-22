@@ -63,6 +63,11 @@ export async function setAuthCookie(): Promise<void> {
   });
 }
 
+export async function clearAuthCookie(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(COOKIE);
+}
+
 /* ------------------------- PIN attempt throttle ------------------------- */
 
 const MAX_FAILS = 5;

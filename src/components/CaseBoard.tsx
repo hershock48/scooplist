@@ -46,6 +46,8 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
   const [error, setError] = useState("");
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<CategoryKey>("handscooped");
+  /** What just left the board, so the owner can undo the decision to stop there. */
+  const [pulled, setPulled] = useState<Flavor | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const inFlightRef = useRef(false);
@@ -93,6 +95,13 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
       ),
     [pickable],
   );
+
+  /* The pulled-flavor note fades on its own; it must never become litter. */
+  useEffect(() => {
+    if (!pulled) return;
+    const id = setTimeout(() => setPulled(null), 8000);
+    return () => clearTimeout(id);
+  }, [pulled]);
 
   useEffect(() => {
     if (sheet) {
@@ -148,10 +157,13 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
   async function markOut(flavor: Flavor) {
     const ok = await post("/api/admin/case", { action: "out", locationId: shopId, flavorId: flavor.id });
     if (ok) {
-      // The tub just left the cabinet; the next tap is "what's going in?" —
-      // and it opens on the board that just lost something.
-      setSheet({ kind: "picker", category: flavor.category });
-      setSearch("");
+      // Taking a tub out is a complete act. The old build force-opened the
+      // picker, which on a phone is a full-height sheet covering the board
+      // you were just looking at - presumptuous when most pulls are not
+      // replacements. Say what happened, offer the next step, get out of
+      // the way.
+      setSheet(null);
+      setPulled(flavor);
       refresh();
     }
   }
@@ -279,6 +291,38 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
         </section>
       ))}
 
+      {/* What just happened, with the optional next step - not a sheet. */}
+      {pulled ? (
+        <div
+          role="status"
+          className="fixed inset-x-0 bottom-[4.75rem] z-40 px-3 pb-[env(safe-area-inset-bottom)]"
+        >
+          <div className="mx-auto flex max-w-3xl items-center gap-3 rounded-full bg-ink px-4 py-2.5 text-cream shadow-lg">
+            <span className="flex-1 text-sm font-medium">
+              <b>{pulled.name}</b> is off the {shopName} board.
+            </span>
+            <button
+              onClick={() => {
+                const c = pulled.category;
+                setPulled(null);
+                openSheet({ kind: "picker", category: c });
+                setSearch("");
+              }}
+              className="shrink-0 rounded-full bg-cream px-3 py-1.5 text-sm font-semibold text-ink"
+            >
+              Add another
+            </button>
+            <button
+              onClick={() => setPulled(null)}
+              aria-label="Dismiss"
+              className="shrink-0 px-1 text-lg leading-none text-cream/70 hover:text-cream"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="fixed inset-x-0 bottom-0 border-t border-ink/10 bg-cream/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
         <div className="mx-auto max-w-3xl">
           <button
@@ -310,14 +354,25 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                   : "New flavor"
             }
             tabIndex={-1}
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-[--radius-panel] bg-cream p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-[--radius-panel]"
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-[--radius-panel] bg-cream px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-[--radius-panel]"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Sticky: on a phone the flavor list can run past the screen, and
+                the only exit used to be a lucky tap on the backdrop. */}
+            <div className="sticky top-0 -mx-5 flex justify-end bg-cream/95 px-5 pb-2 pt-4 backdrop-blur">
+              <button
+                onClick={() => setSheet(null)}
+                aria-label="Close"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-cream-dim text-xl font-semibold text-ink hover:bg-berry/15"
+              >
+                ×
+              </button>
+            </div>
             {errorBanner}
 
             {sheet.kind === "confirm" ? (
               <>
-                <h3 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+                <h3 className="-mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold">
                   Take {sheet.flavor.name} off the {shopName} board?
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">
@@ -335,7 +390,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
               </>
             ) : sheet.kind === "flavor" ? (
               <>
-                <h3 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+                <h3 className="-mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold">
                   {sheet.flavor.name}
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">
@@ -356,7 +411,7 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
               </>
             ) : sheet.kind === "picker" ? (
               <>
-                <h3 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+                <h3 className="-mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold">
                   {sheet.category
                     ? `Add ${CATEGORIES.find((c) => c.key === sheet.category)?.label} at ${shopName}`
                     : `What's going in at ${shopName}?`}
@@ -397,19 +452,25 @@ export default function CaseBoard({ shops, flavors, caseByShop }: Props) {
                   </p>
                 ) : null}
 
-                <button
-                  onClick={() => {
-                    setNewCategory(sheet.category ?? "handscooped");
-                    setSheet({ kind: "new", category: sheet.category });
-                  }}
-                  className="btn-ghost mt-4 w-full"
-                >
-                  New flavor…
-                </button>
+                <div className="mt-4 grid gap-2">
+                  <button
+                    onClick={() => {
+                      setNewCategory(sheet.category ?? "handscooped");
+                      setSheet({ kind: "new", category: sheet.category });
+                    }}
+                    className="btn-ghost w-full"
+                  >
+                    New flavor…
+                  </button>
+                  {/* Nothing more to add is a normal outcome, not a dead end. */}
+                  <button onClick={() => setSheet(null)} className="min-h-12 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline">
+                    Done for now
+                  </button>
+                </div>
               </>
             ) : (
               <>
-                <h3 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+                <h3 className="-mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold">
                   New flavor, into the {shopName} case
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">

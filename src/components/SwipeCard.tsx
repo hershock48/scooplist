@@ -39,12 +39,22 @@ export default function SwipeCard({
   const [sliding, setSliding] = useState(false);
   const start = useRef<{ x: number; y: number } | null>(null);
   const axis = useRef<"undecided" | "x" | "y">("undecided");
+  /*
+   * A pointerup that ended a horizontal drag is STILL followed by a click.
+   * Without this latch the swipe fired onSwiped and then the click fired
+   * onTap, so a swipe opened the details sheet on top of the confirm sheet
+   * and looked like the gesture had done nothing. Any horizontal gesture
+   * eats exactly one click — including one that snapped back, because that
+   * was a cancelled swipe, not a tap.
+   */
+  const swallowClick = useRef(false);
 
   function down(e: React.PointerEvent) {
     // Ignore secondary buttons; let the browser keep right-click etc.
     if (e.button !== 0) return;
     start.current = { x: e.clientX, y: e.clientY };
     axis.current = "undecided";
+    swallowClick.current = false;
     setSliding(false);
   }
 
@@ -83,13 +93,16 @@ export default function SwipeCard({
     setDx(0);
     if (axis.current === "x") {
       axis.current = "undecided";
+      swallowClick.current = true;
       if (pulled) onSwiped();
     }
   }
 
   function click() {
-    // A drag that ended as a swipe must not also register as a tap.
-    if (axis.current === "x" || dx !== 0) return;
+    if (swallowClick.current) {
+      swallowClick.current = false;
+      return;
+    }
     onTap();
   }
 

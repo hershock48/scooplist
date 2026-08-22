@@ -43,6 +43,24 @@ export async function GET() {
       },
       library: { flavors },
       shops: locations().map((l) => l.id),
+      /*
+        Which variables this RUNNING deployment can actually see. Names only,
+        never values — enough to tell "not connected" from "connected to the
+        wrong environment" from "connected but never redeployed", which is
+        otherwise an afternoon of guessing.
+      */
+      env: {
+        BLOB_READ_WRITE_TOKEN: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+        BLOB_STORE_ID: Boolean(process.env.BLOB_STORE_ID),
+        DATABASE_URL: Boolean(process.env.DATABASE_URL),
+        POSTGRES_URL: Boolean(process.env.POSTGRES_URL),
+        SCOOPLIST_PIN: Boolean(process.env.SCOOPLIST_PIN),
+        SCOOPLIST_SECRET: Boolean(process.env.SCOOPLIST_SECRET),
+        otherBlobKeys: Object.keys(process.env).filter(
+          (k) => k.includes("BLOB") && k !== "BLOB_READ_WRITE_TOKEN" && k !== "BLOB_STORE_ID",
+        ).length,
+        vercelEnv: process.env.VERCEL_ENV ?? null,
+      },
       /** Plain English for whoever is looking at this in a hurry. */
       summary: ok
         ? "Fully configured: the case persists and photos upload to real storage."

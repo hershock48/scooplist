@@ -35,6 +35,11 @@ export default async function FlavorsPage() {
           <span aria-current="page" className="text-ink">
             Library
           </span>
+          <form method="post" action="/api/logout">
+            <button type="submit" className="text-ink-soft underline-offset-4 hover:text-berry hover:underline">
+              Sign out
+            </button>
+          </form>
         </nav>
       </header>
 
