@@ -33,10 +33,14 @@ export default async function Home() {
       <p className="mt-2 font-[family-name:var(--font-display)] text-xl font-semibold text-ink sm:text-2xl lg:text-3xl">
         Flavor boards, fresh daily.
       </p>
+      {/*
+        The pitch is a scene, not a feature list: a real thing that happens at
+        2:15 on a Saturday, and the punchline is who did NOT have to be called.
+      */}
       <p className="mt-5 max-w-md text-lg leading-relaxed text-ink-soft lg:max-w-lg lg:text-xl">
-        Blow through a tub, tap it out, tap the next flavor in. Your website,
-        your TV board, and your counter menu update themselves — nobody calls
-        the web person.
+        You blow through the mint chip at 2:15. By 2:16 your website knows,
+        your TV board knows, and the sign over the counter knows. Nobody
+        called anybody.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link href="/login" className="btn">

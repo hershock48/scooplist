@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s | Scooplist",
   },
   description:
-    "The flavor board for scoop shops. Blow a tub, tap it out, tap the next one in — and the website, the TV board, and the counter menu all update themselves.",
+    "The flavor board for scoop shops. Blow through a tub at 2:15, and by 2:16 the website, the TV board, and the sign over the counter have all caught up. Nobody called anybody.",
 };
 
 export default function RootLayout({

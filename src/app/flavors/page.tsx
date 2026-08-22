@@ -17,6 +17,17 @@ export default async function FlavorsPage() {
   await seedIfEmpty();
   const store = getStore();
   const flavors = await store.listFlavors();
+  /*
+    Which shops have each flavor out right now. The library without this is a
+    filing cabinet; with it, it is a picture of the business.
+  */
+  const shops = locations();
+  const inCase: Record<string, string[]> = {};
+  for (const shop of shops) {
+    for (const entry of await store.listCase(shop.id)) {
+      (inCase[entry.flavorId] ??= []).push(shop.id);
+    }
+  }
   const blobConfigured = Boolean(blobToken());
 
   return (
@@ -58,7 +69,7 @@ export default async function FlavorsPage() {
         </p>
       ) : null}
 
-      <FlavorLibrary flavors={flavors} shops={locations()} />
+      <FlavorLibrary flavors={flavors} shops={shops} inCase={inCase} />
     </main>
   );
 }

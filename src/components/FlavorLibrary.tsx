@@ -23,7 +23,7 @@ import type { ShopLocation } from "@/lib/locations";
  * retired flavor keeps its history and can come back next summer.
  */
 
-type Props = { flavors: Flavor[]; shops: ShopLocation[] };
+type Props = { flavors: Flavor[]; shops: ShopLocation[]; inCase: Record<string, string[]> };
 
 /** Downscale to <=900px JPEG so uploads are ~100KB, not a camera original. */
 async function resizeToJpeg(file: File): Promise<{ data: string; contentType: string }> {
@@ -47,7 +47,7 @@ async function resizeToJpeg(file: File): Promise<{ data: string; contentType: st
   }
 }
 
-export default function FlavorLibrary({ flavors, shops }: Props) {
+export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -78,6 +78,29 @@ export default function FlavorLibrary({ flavors, shops }: Props) {
       .filter((f) => (showRetired ? true : !f.retired))
       .filter((f) => !q || f.name.toLowerCase().includes(q));
   }, [flavors, filter, showRetired]);
+
+  /*
+    GROUPED BY BOARD, not one long A-Z run. Alphabetical across every
+    category put Bailey Mountain (adult) next to Birthday Cake (hand-scooped)
+    next to Black Cherry (soft serve), which is alphabetical and useless:
+    nobody thinks about their flavors that way. Boards are the unit
+    everywhere else in the app, so they are the unit here too, and within a
+    board the flavors that are OUT right now sort to the top.
+  */
+  const groups = useMemo(
+    () =>
+      CATEGORIES.map((c) => ({
+        ...c,
+        items: visible
+          .filter((f) => f.category === c.key)
+          .sort((a, b) => {
+            const outA = (inCase[a.id]?.length ?? 0) > 0 ? 0 : 1;
+            const outB = (inCase[b.id]?.length ?? 0) > 0 ? 0 : 1;
+            return outA - outB || a.name.localeCompare(b.name);
+          }),
+      })).filter((g) => g.items.length > 0),
+    [visible, inCase],
+  );
 
   async function save(patch: Record<string, unknown>, note = "Saved"): Promise<Flavor | null> {
     if (inFlightRef.current) return null;
@@ -207,49 +230,70 @@ export default function FlavorLibrary({ flavors, shops }: Props) {
         </div>
       ) : null}
 
-      <ul className="mt-4 grid gap-3">
-        {visible.map((f) => (
-          <li key={f.id} className="card overflow-hidden">
-            <button
-              onClick={() => toggleOpen(f.id)}
-              aria-expanded={openId === f.id}
-              className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left"
-            >
-              {f.photoUrl ? (
-                <Image src={f.photoUrl} alt="" width={48} height={48} unoptimized className="h-12 w-12 rounded-lg object-cover" />
-              ) : (
-                <span aria-hidden className="h-12 w-12 rounded-lg bg-gradient-to-br from-berry-bright/60 to-mint/60" />
-              )}
-              <span className="flex-1">
-                <span className={`block font-semibold ${f.retired ? "text-ink-soft line-through" : ""}`}>
-                  {f.name}
-                </span>
-                <span className="block text-xs text-ink-soft">
-                  {CATEGORIES.find((c) => c.key === f.category)?.label}
-                  {f.allergens.length ? ` · ${f.allergens.join(", ")}` : ""}
-                </span>
-              </span>
-              <span aria-hidden className="text-ink-soft">{openId === f.id ? "▴" : "▾"}</span>
-            </button>
-            {openId === f.id ? (
-              <FlavorEditor
-                flavor={f}
-                save={save}
-                setError={setError}
-                shops={shops}
-                markDirty={() => (dirtyRef.current = true)}
-                working={working}
-              />
-            ) : null}
-          </li>
-        ))}
-        {visible.length === 0 ? (
-          <li className="card px-4 py-6 text-center text-sm text-ink-soft">
-            No flavor matches that
-            {!showRetired ? " — it might be retired; flip on “Show retired” above" : ""}.
-          </li>
-        ) : null}
-      </ul>
+      {groups.map((g) => (
+        <section key={g.key} aria-labelledby={`lib-${g.key}`} className="mt-7">
+          <h2
+            id={`lib-${g.key}`}
+            className="font-[family-name:var(--font-display)] text-xl font-semibold"
+          >
+            {g.label}
+            <span className="ml-2 text-sm font-normal text-ink-soft">{g.items.length}</span>
+          </h2>
+          <ul className="mt-3 grid gap-3">
+            {g.items.map((f) => {
+              const out = inCase[f.id] ?? [];
+              return (
+                <li key={f.id} className="card overflow-hidden">
+                  <button
+                    onClick={() => toggleOpen(f.id)}
+                    aria-expanded={openId === f.id}
+                    className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left"
+                  >
+                    {f.photoUrl ? (
+                      <Image src={f.photoUrl} alt="" width={48} height={48} unoptimized className="h-12 w-12 rounded-lg object-cover" />
+                    ) : (
+                      <span aria-hidden className="h-12 w-12 rounded-lg bg-gradient-to-br from-berry-bright/60 to-mint/60" />
+                    )}
+                    <span className="flex-1">
+                      <span className={`block font-semibold ${f.retired ? "text-ink-soft line-through" : ""}`}>
+                        {f.name}
+                      </span>
+                      {/* Where it is RIGHT NOW — the thing the old flat list never said. */}
+                      <span className="block text-xs text-ink-soft">
+                        {out.length > 0
+                          ? `In the case: ${out
+                              .map((id) => shops.find((s) => s.id === id)?.name ?? id)
+                              .join(", ")}`
+                          : f.retired
+                            ? "Retired"
+                            : "In the library"}
+                        {f.allergens.length ? ` · ${f.allergens.join(", ")}` : ""}
+                      </span>
+                    </span>
+                    <span aria-hidden className="text-ink-soft">{openId === f.id ? "▴" : "▾"}</span>
+                  </button>
+                  {openId === f.id ? (
+                    <FlavorEditor
+                      flavor={f}
+                      save={save}
+                      setError={setError}
+                      shops={shops}
+                      markDirty={() => (dirtyRef.current = true)}
+                      working={working}
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+      {visible.length === 0 ? (
+        <p className="card mt-4 px-4 py-6 text-center text-sm text-ink-soft">
+          No flavor matches that
+          {!showRetired ? " — it might be retired; flip on “Show retired” above" : ""}.
+        </p>
+      ) : null}
     </div>
   );
 }
