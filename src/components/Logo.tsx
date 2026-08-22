@@ -14,12 +14,20 @@ export default function ScooplistMark({
   size = 32,
   className = "",
   idSuffix = "a",
+  animated = false,
 }: {
   size?: number;
   className?: string;
   /** Unique per instance on a page, so gradient ids never collide. */
   idSuffix?: string;
+  /**
+   * Melt it. glazedweb's own rule: the small inline Mark is static, the
+   * hero AnimatedMark drips - a wobbling 30px logo in a working header is
+   * a distraction, the same wobble on a landing page is the brand.
+   */
+  animated?: boolean;
 }) {
+  const a = (cls: string) => (animated ? cls : undefined);
   const id = (name: string) => `sp-${name}-${idSuffix}`;
   const url = (name: string) => `url(#${id(name)})`;
   return (
@@ -48,17 +56,29 @@ export default function ScooplistMark({
   <path d="M 21 31.5 L 43 31.5 L 32 63 Z" fill="#B98A4A"/>
   <path d="M 24.5 41 L 39.5 41 M 26.6 47 L 37.4 47 M 28.7 53 L 35.3 53 M 30.8 59 L 33.2 59 M 25 35 L 31.4 56 M 39 35 L 32.6 56" stroke="#8a6536" strokeWidth="1.4" fill="none"/>
 
+  {/* The whole melt breathes as one, then each drip sags on its own clock. */}
+  <g className={a("sl-goo")}>
   <g fill={url("dark")}>
     <ellipse cx="32" cy="30" rx="13.5" ry="4.5"/>
-    <path d="M 24.5 26.5 C 24.5 30, 24.7 33, 24.9 35.5 C 24.9 37.3, 25.9 37.6, 26.3 35.5 C 26.6 33, 26.4 29.5, 26.4 26.5 Z"/>
+    <path className={a("sl-wobB")} d="M 24.5 26.5 C 24.5 30, 24.7 33, 24.9 35.5 C 24.9 37.3, 25.9 37.6, 26.3 35.5 C 26.6 33, 26.4 29.5, 26.4 26.5 Z"/>
     <path d="M 35.8 26.5 C 35.8 29.5, 36 32, 36.2 34.2 C 36.2 36, 37.2 36.3, 37.5 34.2 C 37.8 32, 37.6 29, 37.6 26.5 Z"/>
   </g>
 
   <g fill={url("goo")}>
-    <path d="M 17.2 26.5 C 17 31, 17.4 34.5, 17.6 37.2 C 17.5 40.4, 18.6 42.6, 20.8 42.7 C 23 42.6, 24.2 40.5, 24 37.9 C 24.3 34.1, 24.4 30.2, 24.5 26.5 Z"/>
-    <path d="M 27.7 27.5 C 27.5 34, 27.9 39.8, 28.2 44.7 C 28 49.1, 29.4 52.2, 31.8 52.4 C 34.3 52.2, 35.6 49.6, 35.3 45.9 C 35.6 39.8, 35.7 33.4, 35.8 27.5 Z"/>
-    <path d="M 38.2 26.5 C 38 30.5, 38.4 33.8, 38.6 36.6 C 38.4 39.8, 39.5 41.9, 41.6 42 C 43.7 41.9, 44.8 39.9, 44.6 37.4 C 44.9 33.9, 45 30.1, 45 26.5 Z"/>
+    <path className={a("sl-wob1")} d="M 17.2 26.5 C 17 31, 17.4 34.5, 17.6 37.2 C 17.5 40.4, 18.6 42.6, 20.8 42.7 C 23 42.6, 24.2 40.5, 24 37.9 C 24.3 34.1, 24.4 30.2, 24.5 26.5 Z"/>
+    <path className={a("sl-wob2")} d="M 27.7 27.5 C 27.5 34, 27.9 39.8, 28.2 44.7 C 28 49.1, 29.4 52.2, 31.8 52.4 C 34.3 52.2, 35.6 49.6, 35.3 45.9 C 35.6 39.8, 35.7 33.4, 35.8 27.5 Z"/>
+    <path className={a("sl-wob3")} d="M 38.2 26.5 C 38 30.5, 38.4 33.8, 38.6 36.6 C 38.4 39.8, 39.5 41.9, 41.6 42 C 43.7 41.9, 44.8 39.9, 44.6 37.4 C 44.9 33.9, 45 30.1, 45 26.5 Z"/>
   </g>
+      </g>
+
+  {/* String + droplet fall from the LEFT drip: clear of the cone all the way
+      down, where glazedweb's fall from the donut into open air. */}
+  <path className={a("sl-string")} d="M 20.8 42.4 L 20.8 45.7" stroke="#BFE07A" strokeWidth="0.82" strokeLinecap="round" fill="none" opacity={animated ? undefined : 0} />
+  <g className={a("sl-droplet")} opacity={animated ? undefined : 0}>
+    <circle cx="20.8" cy="48.6" r="2.3" fill="#BFE07A"/>
+    <circle cx="20.15" cy="47.95" r="0.65" fill="#F1F8DC" opacity="0.9"/>
+  </g>
+  <circle className={a("sl-droplet2")} cx="41.6" cy="45.4" r="1.5" fill="#BFE07A" opacity={animated ? undefined : 0} />
 
   <path d="M 15 22 A 17 17 0 1 1 49 22 Q 47.5 28.5 44 30.5 Q 38 32.5 32 32.5 Q 26 32.5 20 30.5 Q 16.5 28.5 15 22 Z" fill={url("pink")}/>
 
@@ -87,8 +107,8 @@ export default function ScooplistMark({
   </g>
   <circle cx="31.9" cy="50.2" r="0.8" fill="#F1F8DC" opacity="0.9"/>
 
-  <path d="M 19.8 12.8 A 14.3 14.3 0 0 1 26.2 7" fill="none" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" opacity="0.75"/>
-  <circle cx="29.5" cy="6.4" r="1.15" fill="#FFFFFF" opacity="0.75"/>
+  <path className={a("sl-sheen")} d="M 19.8 12.8 A 14.3 14.3 0 0 1 26.2 7" fill="none" stroke="#FFFFFF" strokeWidth="2.6" strokeLinecap="round" opacity="0.75"/>
+  <circle className={a("sl-sheen")} cx="29.5" cy="6.4" r="1.15" fill="#FFFFFF" opacity="0.75"/>
 
 </svg>
   );

@@ -54,6 +54,87 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   The drip, transposed from glazedweb's AnimatedMark (app/globals.css lines
+   88-117 there). Same keyframes, same durations, same negative delays — the
+   desync between the four sags is what makes it read as goo instead of a
+   pulsing blob, so the numbers are copied, not re-invented. Only the travel
+   distances are rescaled: the donut is r=52 in a 200-unit box, this scoop is
+   r=17 in a 64-unit box, so lengths are ×0.327.
+--------------------------------------------------------------------------- */
+.sl-goo {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: sl-breathe 6s ease-in-out infinite;
+}
+@keyframes sl-breathe {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.02); }
+}
+
+.sl-wob1, .sl-wob2, .sl-wob3, .sl-wobB {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+}
+.sl-wob1 { animation: sl-sagg 3.8s ease-in-out infinite -0.6s; }
+.sl-wob2 { animation: sl-sagg 4.9s ease-in-out infinite -2.1s; }
+.sl-wob3 { animation: sl-sagg 4.3s ease-in-out infinite -1.3s; }
+.sl-wobB { animation: sl-sagg 5.6s ease-in-out infinite -3s; }
+@keyframes sl-sagg {
+  0%, 100% { transform: scaleY(1) scaleX(1); }
+  50% { transform: scaleY(1.07) scaleX(0.98); }
+}
+
+.sl-string {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: sl-stringy 3.4s cubic-bezier(0.55, 0.1, 0.8, 0.5) infinite;
+}
+@keyframes sl-stringy {
+  0% { transform: scaleY(0.1); opacity: 0; }
+  25% { transform: scaleY(0.8); opacity: 1; }
+  60% { transform: scaleY(1.7); opacity: 0.85; }
+  80% { transform: scaleY(2.4); opacity: 0; }
+  100% { transform: scaleY(0.1); opacity: 0; }
+}
+
+/* Same 3.4s as the string: the strand stretches, then this lets go. */
+.sl-droplet {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sl-fall 3.4s cubic-bezier(0.5, 0.08, 0.85, 0.6) infinite;
+}
+@keyframes sl-fall {
+  0% { transform: translateY(-5.2px) scaleY(1.5) scaleX(0.7); opacity: 0; }
+  22% { transform: translateY(-2.6px) scaleY(1.2) scaleX(0.85); opacity: 1; }
+  60% { transform: translateY(3.3px) scale(1); opacity: 1; }
+  100% { transform: translateY(12.4px) scaleY(1.15) scaleX(0.9); opacity: 0; }
+}
+
+.sl-droplet2 {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sl-fall2 5.1s cubic-bezier(0.5, 0.08, 0.85, 0.6) infinite -2.4s;
+}
+@keyframes sl-fall2 {
+  0% { transform: translateY(-3.3px) scaleY(1.4) scaleX(0.75); opacity: 0; }
+  25% { transform: translateY(-1.3px) scale(1); opacity: 1; }
+  65% { transform: translateY(2.6px) scale(1); opacity: 1; }
+  100% { transform: translateY(8.5px) scale(1); opacity: 0; }
+}
+
+.sl-sheen { animation: sl-shimmer 6s ease-in-out infinite; }
+@keyframes sl-shimmer {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
+/* The resting state is the finished drawing: no motion, nothing missing. */
+@media (prefers-reduced-motion: reduce) {
+  .sl-goo, .sl-wob1, .sl-wob2, .sl-wob3, .sl-wobB, .sl-sheen { animation: none; }
+  .sl-string, .sl-droplet, .sl-droplet2 { animation: none; opacity: 0; }
+}
+
 @layer components {
   /* 48px tall: this app's primary user has cold hands. */
   .btn {

@@ -17,7 +17,7 @@ export default async function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center px-6 py-16">
       <p className="flex items-center gap-3 font-[family-name:var(--font-display)] text-3xl font-bold text-berry">
-        <ScooplistMark size={44} />
+        <ScooplistMark size={64} animated />
         Scooplist
       </p>
       <h1 className="mt-4 font-[family-name:var(--font-display)] text-4xl font-semibold leading-tight">
