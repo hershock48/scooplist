@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import FlavorLibrary from "@/components/FlavorLibrary";
 import ScooplistMark from "@/components/Logo";
+import { blobToken } from "@/lib/blob";
 import { isAuthed } from "@/lib/auth";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
@@ -15,7 +16,7 @@ export default async function FlavorsPage() {
   await seedIfEmpty();
   const store = getStore();
   const flavors = await store.listFlavors();
-  const blobConfigured = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const blobConfigured = Boolean(blobToken());
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6">

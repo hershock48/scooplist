@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { locations } from "@/lib/locations";
+import { blobToken } from "@/lib/blob";
 import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const store = getStore();
-  const blob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const blob = Boolean(blobToken());
 
   let flavors = 0;
   let reachable = true;

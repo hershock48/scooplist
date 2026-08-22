@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthed } from "@/lib/auth";
+import { blobToken } from "@/lib/blob";
 
 export const runtime = "nodejs";
 
@@ -43,12 +44,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That photo didn't come through — try again." }, { status: 400 });
   }
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  const token = blobToken();
+  if (token) {
     const { put } = await import("@vercel/blob");
     const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const blob = await put(`flavors/${Date.now()}-${safe}`, Buffer.from(data, "base64"), {
       access: "public",
       contentType,
+      token,
     });
     return NextResponse.json({ ok: true, url: blob.url, storage: "blob" });
   }
