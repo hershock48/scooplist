@@ -73,6 +73,19 @@ export function exampleItem(): string {
   return process.env.SCOOPLIST_EXAMPLE?.trim() || "Lemon Poppyseed";
 }
 
+/**
+ * Which copy voice the admin speaks. The action sheet said "Tub's empty"
+ * over a bottle of Pinot Grigio on the tavern install, which is how this
+ * earned its place next to exampleItem(): verbs are vertical too. A
+ * deployment with its own categories gets neutral service-industry wording;
+ * the default vertical keeps the scoop-shop charm. Client components get
+ * this as a prop (a string flag, since functions cannot cross the
+ * server-to-client boundary).
+ */
+export function voice(): "scoops" | "neutral" {
+  return process.env.SCOOPLIST_CATEGORIES ? "neutral" : "scoops";
+}
+
 export function categories(): Category[] {
   const raw = process.env.SCOOPLIST_CATEGORIES;
   if (!raw) return DEFAULT_CATEGORIES;

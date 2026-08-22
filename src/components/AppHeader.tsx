@@ -22,9 +22,12 @@ type Item = { href: string; label: string; external?: boolean };
 export default function AppHeader({
   current,
   boardHref,
+  voice = "scoops",
 }: {
   current: "case" | "library" | "history";
   boardHref: string;
+  /** Copy voice (vertical.ts voice()): "The case" is scoop vocabulary. */
+  voice?: "scoops" | "neutral";
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -44,7 +47,7 @@ export default function AppHeader({
   }, [open]);
 
   const items: Item[] = [
-    { href: "/case", label: "The case" },
+    { href: "/case", label: voice === "neutral" ? "The board" : "The case" },
     { href: "/flavors", label: "Library" },
     { href: "/history", label: "History" },
     { href: boardHref, label: "TV board ↗", external: true },

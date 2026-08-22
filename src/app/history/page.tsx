@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
+import { voice } from "@/lib/vertical";
 import type { CaseEntry, Flavor } from "@/lib/domain";
 import { getStore } from "@/lib/store";
 
@@ -88,13 +89,21 @@ export default async function HistoryPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6">
-      <AppHeader current="history" boardHref={`/board/${shops[0]?.id ?? ""}`} />
+      <AppHeader current="history" boardHref={`/board/${shops[0]?.id ?? ""}`} voice={voice()} />
 
       <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-semibold">
-        What the case remembers
+        {voice() === "neutral" ? "What the board remembers" : "What the case remembers"}
       </h1>
+      {/* Say what each column MEANS, in the sentence, not in a tooltip: the
+          owner's first reaction to this page was "no clue what it's
+          tracking". */}
       <p className="mt-2 text-ink-soft">
-        Every flavor that has ever been on a board, and how it did. Nothing is
+        Everything that has ever been on a board, and how it did.{" "}
+        <span className="font-semibold">Times on</span> is how often it went
+        on, <span className="font-semibold">days total</span> is how long it
+        stayed across all of those runs, and{" "}
+        <span className="font-semibold">last {WINDOW_DAYS} days</span> is the
+        share of the last {WINDOW_DAYS} days it was available. Nothing is
         ever deleted, so this is the whole record.
       </p>
 
@@ -125,7 +134,9 @@ export default async function HistoryPage() {
                 <table className="w-full min-w-[540px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wide text-ink-soft">
-                      <th scope="col" className="px-4 py-3 font-semibold">Flavor</th>
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        {voice() === "neutral" ? "Item" : "Flavor"}
+                      </th>
                       <th scope="col" className="px-3 py-3 font-semibold">Times on</th>
                       <th scope="col" className="px-3 py-3 font-semibold">Days total</th>
                       <th scope="col" className="px-3 py-3 font-semibold">Last {WINDOW_DAYS} days</th>

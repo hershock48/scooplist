@@ -4,13 +4,13 @@ import CaseBoard from "@/components/CaseBoard";
 import AppHeader from "@/components/AppHeader";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
-import { categories, exampleItem } from "@/lib/vertical";
+import { categories, exampleItem, voice } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
 import type { CaseStatus } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "The case" };
+export const metadata = { title: voice() === "neutral" ? "The board" : "The case" };
 
 export default async function CasePage() {
   if (!(await isAuthed())) redirect("/login");
@@ -34,7 +34,7 @@ export default async function CasePage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-28 pt-6">
-      <AppHeader current="case" boardHref={`/board/${shops[0]?.id ?? ""}`} />
+      <AppHeader current="case" boardHref={`/board/${shops[0]?.id ?? ""}`} voice={voice()} />
 
       {/* Shop voice out front; the Vercel specifics live in the README for
           the person who can actually act on them. */}
@@ -50,6 +50,7 @@ export default async function CasePage() {
         categories={categories()}
         flavors={flavors}
         example={exampleItem()}
+        voice={voice()}
         caseByShop={caseByShop}
       />
     </main>

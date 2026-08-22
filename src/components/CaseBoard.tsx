@@ -44,8 +44,33 @@ type Props = {
   flavors: Flavor[];
   /** Vertical-appropriate placeholder name (vertical.ts exampleItem). */
   example: string;
+  /** Copy voice (vertical.ts voice()): scoop-shop charm or neutral verbs. */
+  voice: "scoops" | "neutral";
   caseByShop: Record<string, CaseEntryLite[]>;
 };
+
+/** The verbs that turned out to be vertical: "Tub's empty" over a bottle of
+    Pinot Grigio was the tavern owner's first question. */
+const COPY = {
+  scoops: {
+    noun: "flavor",
+    out: "Tub's empty, take it off the board",
+    start: "Start scooping it",
+    ondeck: "Move to on deck",
+    inCase: (shop: string) => `In the ${shop} case.`,
+    low: (shop: string) => `Running low in the ${shop} case.`,
+    newInto: (shop: string) => `New flavor, into the ${shop} case`,
+  },
+  neutral: {
+    noun: "item",
+    out: "86 it, take it off the board",
+    start: "Put it back on the board",
+    ondeck: "On deck, it goes on next",
+    inCase: (shop: string) => `On the ${shop} board.`,
+    low: (shop: string) => `Running low at ${shop}, last call.`,
+    newInto: (shop: string) => `New item, onto the ${shop} board`,
+  },
+} as const;
 
 type Sheet =
   | { kind: "flavor"; flavor: Flavor }
@@ -54,7 +79,8 @@ type Sheet =
   | { kind: "new"; category?: CategoryKey }
   | null;
 
-export default function CaseBoard({ shops, categories, flavors, example, caseByShop }: Props) {
+export default function CaseBoard({ shops, categories, flavors, example, voice, caseByShop }: Props) {
+  const copy = COPY[voice];
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -291,7 +317,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
 
       {inCaseCount > 0 ? (
         <p className="mt-4 text-sm text-ink-soft">
-          Swipe a flavor left to pull it off the board, or tap it for details.
+          Swipe a {copy.noun} left to pull it off the board, or tap it for details.
         </p>
       ) : (
         <div className="card mt-5 px-5 py-6 text-center">
@@ -326,7 +352,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
               {/* The board's own door: opens the picker already filtered to it. */}
               <button
                 onClick={() => { openSheet({ kind: "picker", category: b.key }); setSearch(""); }}
-                aria-label={`Add a ${b.label} flavor to ${shopName}`}
+                aria-label={`Add a ${b.label} ${copy.noun} to ${shopName}`}
                 className="inline-flex min-h-10 items-center gap-1 rounded-full bg-berry px-4 font-semibold text-cream transition-colors hover:bg-berry-bright"
               >
                 <span aria-hidden className="text-lg leading-none">+</span>
@@ -437,7 +463,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
                     disabled={working}
                     className="btn !min-h-11 !px-4 !py-2 text-sm disabled:opacity-60"
                   >
-                    Start scooping it
+                    {copy.start}
                   </button>
                   <button
                     onClick={() => markOut(f)}
@@ -491,7 +517,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
             onClick={() => { openSheet({ kind: "picker" }); setSearch(""); }}
             className="btn w-full"
           >
-            Add a flavor to {shopName}
+            Add a {copy.noun} to {shopName}
           </button>
         </div>
       </div>
@@ -512,8 +538,8 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
               sheet.kind === "flavor" || sheet.kind === "confirm"
                 ? sheet.flavor.name
                 : sheet.kind === "picker"
-                  ? "Add a flavor"
-                  : "New flavor"
+                  ? `Add a ${copy.noun}`
+                  : `New ${copy.noun}`
             }
             tabIndex={-1}
             className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-[--radius-panel] bg-cream px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-[--radius-panel]"
@@ -556,9 +582,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
                   {sheet.flavor.name}
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">
-                  {sheetEntry?.status === "low"
-                    ? `Running low in the ${shopName} case.`
-                    : `In the ${shopName} case.`}{" "}
+                  {sheetEntry?.status === "low" ? copy.low(shopName) : copy.inCase(shopName)}{" "}
                   {sheet.flavor.sizes.map((s) => `${s.label} ${s.price}`).join(" · ")}
                 </p>
                 <div className="mt-5 grid gap-3">
@@ -566,7 +590,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
                     onClick={() => openSheet({ kind: "confirm", flavor: sheet.flavor })}
                     className="btn w-full"
                   >
-                    Tub&apos;s empty, take it off the board
+                    {copy.out}
                   </button>
                   {/* Last call: the state between full and blown. The board
                       and the website both say so the moment it flips. */}
@@ -582,7 +606,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
                     className="btn-ghost w-full disabled:opacity-60"
                     disabled={working}
                   >
-                    Move to on deck
+                    {copy.ondeck}
                   </button>
                   <button onClick={() => setSheet(null)} className="min-h-12 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline">
                     Never mind
@@ -640,7 +664,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
                     }}
                     className="btn-ghost w-full"
                   >
-                    New flavor…
+                    New {copy.noun}…
                   </button>
                   {/* Nothing more to add is a normal outcome, not a dead end. */}
                   <button onClick={() => setSheet(null)} className="min-h-12 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline">
@@ -651,7 +675,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
             ) : (
               <>
                 <h3 className="-mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold">
-                  New flavor, into the {shopName} case
+                  {copy.newInto(shopName)}
                 </h3>
                 <p className="mt-1 text-sm text-ink-soft">
                   Name and board now, mid-rush; photo, story, and prices later
@@ -662,7 +686,7 @@ export default function CaseBoard({ shops, categories, flavors, example, caseByS
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder={example}
                   className="field mt-4"
-                  aria-label="Flavor name"
+                  aria-label={`${copy.noun} name`}
                   autoFocus
                 />
                 <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Board">

@@ -36,6 +36,8 @@ type Props = {
   allergenOptions: string[];
   /** Vertical-appropriate placeholder name (vertical.ts exampleItem). */
   example: string;
+  /** Copy voice (vertical.ts voice()): "churned" is scoop vocabulary. */
+  voice: "scoops" | "neutral";
   inCase: Record<string, string[]>;
 };
 
@@ -61,7 +63,8 @@ async function resizeToJpeg(file: File): Promise<{ data: string; contentType: st
   }
 }
 
-export default function FlavorLibrary({ flavors, shops, categories, allergenOptions, example, inCase }: Props) {
+export default function FlavorLibrary({ flavors, shops, categories, allergenOptions, example, voice, inCase }: Props) {
+  const noun = voice === "neutral" ? "item" : "flavor";
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -193,7 +196,7 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
       {/* Create here, not just from the case, no shop's board required. */}
       <div className="card mt-5 p-4">
         <label htmlFor="lib-new" className="block text-sm font-semibold">
-          New flavor
+          New {noun}
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
           <input
@@ -220,8 +223,9 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
           </button>
         </div>
         <p className="mt-2 text-xs text-ink-soft">
-          It lands in the library only, put it in a case from The Case screen
-          when it&apos;s churned.
+          {voice === "neutral"
+            ? "It lands in the library only. Put it on the board from The Board screen when it goes on."
+            : "It lands in the library only, put it in a case from The Case screen when it’s churned."}
         </p>
       </div>
 
@@ -230,7 +234,7 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Search…"
-          aria-label="Search flavors"
+          aria-label={`Search ${noun}s`}
           className="field max-w-xs"
         />
         <label className="flex min-h-12 cursor-pointer items-center gap-2 text-sm font-medium text-ink-soft">
@@ -290,7 +294,7 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
                       {/* Where it is RIGHT NOW, the thing the old flat list never said. */}
                       <span className="block text-xs text-ink-soft">
                         {out.length > 0
-                          ? `In the case: ${out
+                          ? `${voice === "neutral" ? "On the board" : "In the case"}: ${out
                               .map((id) => shops.find((s) => s.id === id)?.name ?? id)
                               .join(", ")}`
                           : f.retired
@@ -321,7 +325,7 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
       ))}
       {visible.length === 0 && retirementHome.length === 0 ? (
         <p className="card mt-4 px-4 py-6 text-center text-sm text-ink-soft">
-          No flavor matches that
+          No {noun} matches that
           {!showRetired ? ", it might be retired; flip on “Show retired” above" : ""}.
         </p>
       ) : null}

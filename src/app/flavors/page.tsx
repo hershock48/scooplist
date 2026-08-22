@@ -5,12 +5,12 @@ import AppHeader from "@/components/AppHeader";
 import { blobToken } from "@/lib/blob";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
-import { allergens, categories, exampleItem } from "@/lib/vertical";
+import { allergens, categories, exampleItem, voice } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Flavor library" };
+export const metadata = { title: voice() === "neutral" ? "The library" : "Flavor library" };
 
 export default async function FlavorsPage() {
   if (!(await isAuthed())) redirect("/login");
@@ -33,14 +33,17 @@ export default async function FlavorsPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6">
-      <AppHeader current="library" boardHref={`/board/${shops[0]?.id ?? ""}`} />
+      <AppHeader current="library" boardHref={`/board/${shops[0]?.id ?? ""}`} voice={voice()} />
 
       <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-semibold">
-        Every flavor you&apos;ve ever churned
+        {voice() === "neutral"
+          ? "Everything you have ever served"
+          : "Every flavor you’ve ever churned"}
       </h1>
       <p className="mt-2 text-ink-soft">
-        The case pulls from here. Photos, stories, allergens, and prices live
-        on the flavor, so they follow it into every shop and every board.
+        {voice() === "neutral"
+          ? "The boards pull from here. Photos, descriptions, and prices live on the item, so they follow it onto every board."
+          : "The case pulls from here. Photos, stories, allergens, and prices live on the flavor, so they follow it into every shop and every board."}
       </p>
       {!blobConfigured ? (
         <p className="card mt-4 border-berry/40 bg-berry/5 px-4 py-3 text-sm font-medium text-berry">
@@ -55,6 +58,7 @@ export default async function FlavorsPage() {
         categories={categories()}
         allergenOptions={allergens()}
         example={exampleItem()}
+        voice={voice()}
         inCase={inCase}
       />
     </main>
