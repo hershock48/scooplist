@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ALLERGENS, CATEGORIES, type Allergen, type CategoryKey, type Flavor, type Size } from "@/lib/domain";
 
@@ -46,6 +46,8 @@ export default function FlavorLibrary({ flavors }: Props) {
   const [filter, setFilter] = useState("");
   const [showRetired, setShowRetired] = useState(false);
   const [error, setError] = useState("");
+  /** Positive confirmation. A save that only flashes is a save you distrust. */
+  const [saved, setSaved] = useState("");
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<CategoryKey>("handscooped");
   /** The open editor sets this; collapsing a dirty editor asks first. */
@@ -55,6 +57,12 @@ export default function FlavorLibrary({ flavors }: Props) {
 
   const working = busy || pending;
 
+  useEffect(() => {
+    if (!saved) return;
+    const id = setTimeout(() => setSaved(""), 4000);
+    return () => clearTimeout(id);
+  }, [saved]);
+
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
     return flavors
@@ -62,10 +70,11 @@ export default function FlavorLibrary({ flavors }: Props) {
       .filter((f) => !q || f.name.toLowerCase().includes(q));
   }, [flavors, filter, showRetired]);
 
-  async function save(patch: Record<string, unknown>): Promise<Flavor | null> {
+  async function save(patch: Record<string, unknown>, note = "Saved"): Promise<Flavor | null> {
     if (inFlightRef.current) return null;
     inFlightRef.current = true;
     setError("");
+    setSaved("");
     setBusy(true);
     try {
       const res = await fetch("/api/admin/flavors", {
@@ -83,6 +92,7 @@ export default function FlavorLibrary({ flavors }: Props) {
         return null;
       }
       dirtyRef.current = false;
+      setSaved(note);
       startTransition(() => router.refresh());
       return json.flavor ?? null;
     } catch {
@@ -110,7 +120,7 @@ export default function FlavorLibrary({ flavors }: Props) {
   async function createFlavor() {
     const name = newName.trim();
     if (!name || working) return;
-    const created = await save({ name, category: newCategory });
+    const created = await save({ name, category: newCategory }, `${name} added to the library`);
     if (created) {
       setNewName("");
       setOpenId(created.id);
@@ -179,6 +189,15 @@ export default function FlavorLibrary({ flavors }: Props) {
         </p>
       ) : null}
 
+      {/* Says so, out loud, where the eye already is. */}
+      {saved ? (
+        <div role="status" className="fixed inset-x-0 bottom-4 z-40 px-3">
+          <p className="mx-auto w-fit rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-cream shadow-lg">
+            {saved}
+          </p>
+        </div>
+      ) : null}
+
       <ul className="mt-4 grid gap-3">
         {visible.map((f) => (
           <li key={f.id} className="card overflow-hidden">
@@ -233,7 +252,7 @@ function FlavorEditor({
   working,
 }: {
   flavor: Flavor;
-  save: (patch: Record<string, unknown>) => Promise<Flavor | null>;
+  save: (patch: Record<string, unknown>, note?: string) => Promise<Flavor | null>;
   setError: (e: string) => void;
   markDirty: () => void;
   working: boolean;
@@ -274,7 +293,7 @@ function FlavorEditor({
       category,
       allergens,
       sizes: sizes.filter((s) => s.label.trim() && s.price.trim()),
-    });
+    }, `${name} saved`);
   }
 
   async function onPhoto(file: File | undefined) {
@@ -297,8 +316,8 @@ function FlavorEditor({
         setError(json.error ?? "The photo didn't upload — try again.");
         return;
       }
-      const saved = await save({ id: flavor.id, photoUrl: json.url });
-      if (!saved) return; // save() already surfaced its error
+      const ok = await save({ id: flavor.id, photoUrl: json.url }, "Photo added");
+      if (!ok) return; // save() already surfaced its error
     } catch {
       // A file the browser can't decode (HEIC on some browsers, a corrupt
       // shot) rejects in resizeToJpeg — that must not fail silently.
@@ -411,7 +430,12 @@ function FlavorEditor({
           {working ? "Saving…" : "Save"}
         </button>
         <button
-          onClick={() => save({ id: flavor.id, retired: !flavor.retired })}
+          onClick={() =>
+            save(
+              { id: flavor.id, retired: !flavor.retired },
+              flavor.retired ? `${flavor.name} is back` : `${flavor.name} retired`,
+            )
+          }
           className="min-h-12 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline"
           disabled={working}
         >

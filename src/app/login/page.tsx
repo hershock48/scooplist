@@ -18,13 +18,21 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center px-6 text-center">
-      {/* Same stack as the landing, smaller: mark up top, name beneath. */}
-      <ScooplistMark animated className="h-auto w-[104px]" />
-      <p className="mt-1 font-[family-name:var(--font-display)] text-3xl font-bold text-berry">
+      {/*
+        The same brand stack as the landing, only trimmed enough to leave the
+        PIN field and its button above the fold on a small phone: this is the
+        screen the owner opens every shift, so it should look like the
+        product, not like a password prompt.
+      */}
+      <ScooplistMark animated className="h-auto w-[150px] sm:w-[200px]" />
+      <p className="mt-1 font-[family-name:var(--font-display)] text-4xl font-bold tracking-tight text-berry sm:text-5xl">
         Scooplist
       </p>
-      <h1 className="mt-3 text-xl font-semibold">Shop PIN</h1>
-      <form method="post" action="/api/login" className="mt-4 w-full">
+      <p className="mt-1.5 font-[family-name:var(--font-display)] text-lg font-semibold text-ink sm:text-xl">
+        Flavor boards, fresh daily.
+      </p>
+      <h1 className="mt-7 text-xl font-semibold">Shop PIN</h1>
+      <form method="post" action="/api/login" className="mt-3 w-full">
         <input
           name="pin"
           type="password"
