@@ -3,7 +3,16 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ALLERGENS, CATEGORIES, type Allergen, type CategoryKey, type Flavor, type Size } from "@/lib/domain";
+import {
+  ALLERGENS,
+  CATEGORIES,
+  hasShopPricing,
+  type Allergen,
+  type CategoryKey,
+  type Flavor,
+  type Size,
+} from "@/lib/domain";
+import type { ShopLocation } from "@/lib/locations";
 
 /**
  * The library: everything the shop has ever churned, edited in place — and
@@ -14,7 +23,7 @@ import { ALLERGENS, CATEGORIES, type Allergen, type CategoryKey, type Flavor, ty
  * retired flavor keeps its history and can come back next summer.
  */
 
-type Props = { flavors: Flavor[] };
+type Props = { flavors: Flavor[]; shops: ShopLocation[] };
 
 /** Downscale to <=900px JPEG so uploads are ~100KB, not a camera original. */
 async function resizeToJpeg(file: File): Promise<{ data: string; contentType: string }> {
@@ -38,7 +47,7 @@ async function resizeToJpeg(file: File): Promise<{ data: string; contentType: st
   }
 }
 
-export default function FlavorLibrary({ flavors }: Props) {
+export default function FlavorLibrary({ flavors, shops }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -227,6 +236,7 @@ export default function FlavorLibrary({ flavors }: Props) {
                 flavor={f}
                 save={save}
                 setError={setError}
+                shops={shops}
                 markDirty={() => (dirtyRef.current = true)}
                 working={working}
               />
@@ -248,10 +258,12 @@ function FlavorEditor({
   flavor,
   save,
   setError,
+  shops,
   markDirty,
   working,
 }: {
   flavor: Flavor;
+  shops: ShopLocation[];
   save: (patch: Record<string, unknown>, note?: string) => Promise<Flavor | null>;
   setError: (e: string) => void;
   markDirty: () => void;
@@ -262,6 +274,20 @@ function FlavorEditor({
   const [category, setCategory] = useState<CategoryKey>(flavor.category);
   const [allergens, setAllergens] = useState<Allergen[]>(flavor.allergens);
   const [sizes, setSizes] = useState<Size[]>(flavor.sizes);
+  /*
+    Per-shop prices stay collapsed unless this flavor already has them: most
+    flavors cost the same at both counters, and a pricing grid on every row
+    would bury the fields people actually edit.
+  */
+  const [perShop, setPerShop] = useState(hasShopPricing(flavor));
+  const [shopSizes, setShopSizes] = useState<Record<string, Size[]>>(() =>
+    Object.fromEntries(
+      shops.map((s) => [
+        s.id,
+        flavor.sizesByShop?.[s.id]?.length ? flavor.sizesByShop[s.id] : flavor.sizes,
+      ]),
+    ),
+  );
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -279,6 +305,14 @@ function FlavorEditor({
     setSizes((cur) => cur.map((s, j) => (j === i ? { ...s, [key]: value } : s)));
   }
 
+  function setShopSize(shop: string, i: number, key: keyof Size, value: string) {
+    touch();
+    setShopSizes((cur) => ({
+      ...cur,
+      [shop]: (cur[shop] ?? []).map((s, j) => (j === i ? { ...s, [key]: value } : s)),
+    }));
+  }
+
   async function onSave() {
     // A half-filled size row must not vanish silently on save.
     const halfFilled = sizes.some((s) => (s.label.trim() === "") !== (s.price.trim() === ""));
@@ -286,14 +320,26 @@ function FlavorEditor({
       setError("One of the size rows is missing its name or price — fill it in or clear both boxes.");
       return;
     }
-    await save({
-      id: flavor.id,
-      name,
-      description,
-      category,
-      allergens,
-      sizes: sizes.filter((s) => s.label.trim() && s.price.trim()),
-    }, `${name} saved`);
+    await save(
+      {
+        id: flavor.id,
+        name,
+        description,
+        category,
+        allergens,
+        sizes: sizes.filter((s) => s.label.trim() && s.price.trim()),
+        // Off means "every shop uses the default" — an empty object clears it.
+        sizesByShop: perShop
+          ? Object.fromEntries(
+              shops.map((s) => [
+                s.id,
+                (shopSizes[s.id] ?? []).filter((x) => x.label.trim() && x.price.trim()),
+              ]),
+            )
+          : {},
+      },
+      `${name} saved`,
+    );
   }
 
   async function onPhoto(file: File | undefined) {
@@ -413,6 +459,49 @@ function FlavorEditor({
           </button>
         </div>
       </fieldset>
+
+      <div className="mt-4">
+        <label className="flex min-h-12 cursor-pointer items-center gap-2 text-sm font-semibold">
+          <input
+            type="checkbox"
+            checked={perShop}
+            onChange={(e) => { touch(); setPerShop(e.target.checked); }}
+            className="h-4 w-4 accent-[--color-berry]"
+          />
+          This one costs different at each shop
+        </label>
+        {perShop ? (
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {shops.map((s) => (
+              <fieldset key={s.id} className="rounded-[--radius-card] border border-ink/10 p-3">
+                <legend className="px-1 text-sm font-semibold">{s.name}</legend>
+                <div className="grid gap-2">
+                  {(shopSizes[s.id] ?? []).map((size, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input
+                        value={size.label}
+                        onChange={(e) => setShopSize(s.id, i, "label", e.target.value)}
+                        aria-label={`${s.name} size ${i + 1} name`}
+                        className="field"
+                      />
+                      <input
+                        value={size.price}
+                        onChange={(e) => setShopSize(s.id, i, "price", e.target.value)}
+                        aria-label={`${s.name} size ${i + 1} price`}
+                        className="field max-w-28"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-1 text-xs text-ink-soft">
+            Off means every shop charges the prices above.
+          </p>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <label className="btn-ghost cursor-pointer">

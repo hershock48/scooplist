@@ -4,6 +4,7 @@ import FlavorLibrary from "@/components/FlavorLibrary";
 import ScooplistMark from "@/components/Logo";
 import { blobToken } from "@/lib/blob";
 import { isAuthed } from "@/lib/auth";
+import { locations } from "@/lib/locations";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
 
@@ -57,7 +58,7 @@ export default async function FlavorsPage() {
         </p>
       ) : null}
 
-      <FlavorLibrary flavors={flavors} />
+      <FlavorLibrary flavors={flavors} shops={locations()} />
     </main>
   );
 }

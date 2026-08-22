@@ -45,6 +45,13 @@ authority on the real configuration.
   `DATABASE_URL`, else in-memory with a visible warning; jsonb blobs,
   self-creating tables). Extracted per glaze/catalog — do not invent a new
   store shape here.
+- **Prices are per flavor, with per-shop overrides.** `Flavor.sizes` is the
+  default list; `sizesByShop` overrides it for a counter that charges
+  differently, and `sizesFor(flavor, shop)` resolves it. The override replaces
+  the whole list rather than individual sizes — a per-size merge leaves a
+  half-priced flavor the day someone renames a size. The feed resolves per
+  location, so each shop's site, board, and any future checkout quote that
+  shop's own numbers. The library keeps it collapsed until a flavor needs it.
 - **Case entries close, never delete.** `removedAt` is the history — "Mint
   Chip lasted four days" is the future analytics feature, and a bar logs a
   blown keg rather than erasing it.

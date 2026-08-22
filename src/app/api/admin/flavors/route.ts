@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAuthed } from "@/lib/auth";
+import { locations } from "@/lib/locations";
 import {
   ALLERGENS,
   CATEGORIES,
@@ -22,6 +23,25 @@ function cleanSizes(v: unknown): Size[] | null {
     .map((s) => ({ label: clean(s?.label, 40), price: clean(s?.price, 20) }))
     .filter((s) => s.label && s.price);
   return sizes.length > 0 ? sizes : null;
+}
+
+/**
+ * Per-shop price overrides. Only known shops are kept, a shop mapped to an
+ * empty list means "back on the default price", and every list runs through
+ * the same cleaner as the default so a shop cannot smuggle in a size with a
+ * blank price.
+ */
+function cleanShopSizes(v: unknown): Record<string, Size[]> | undefined {
+  if (v === null) return {};
+  if (typeof v !== "object" || Array.isArray(v)) return undefined;
+  const known = new Set(locations().map((l) => l.id));
+  const out: Record<string, Size[]> = {};
+  for (const [shop, list] of Object.entries(v as Record<string, unknown>)) {
+    if (!known.has(shop)) continue;
+    const sizes = cleanSizes(list);
+    if (sizes) out[shop] = sizes;
+  }
+  return out;
 }
 
 /**
@@ -83,6 +103,7 @@ export async function POST(request: Request) {
     tags,
     photoUrl,
     sizes: cleanSizes(b.sizes) ?? existing?.sizes ?? DEFAULT_SIZES[category],
+    sizesByShop: cleanShopSizes(b.sizesByShop) ?? existing?.sizesByShop,
     retired: typeof b.retired === "boolean" ? b.retired : existing?.retired ?? false,
     createdAt: existing?.createdAt ?? Date.now(),
   };

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { locationById } from "@/lib/locations";
 import { seedIfEmpty } from "@/lib/seed";
-import { CATEGORIES } from "@/lib/domain";
+import { CATEGORIES, sizesFor } from "@/lib/domain";
 import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -50,7 +50,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ location: stri
         allergens: flavor!.allergens,
         tags: flavor!.tags,
         photoUrl: flavor!.photoUrl,
-        sizes: flavor!.sizes,
+        // This shop's own prices when it has them, the default otherwise.
+        sizes: sizesFor(flavor!, location.id),
         inCaseSince: entry.addedAt,
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
