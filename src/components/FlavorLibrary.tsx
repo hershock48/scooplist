@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import {
   ALLERGENS,
   CATEGORIES,
+  RETIRE_GRACE_MS,
   hasShopPricing,
+  recentlyRetired,
   type Allergen,
   type CategoryKey,
   type Flavor,
@@ -87,19 +89,34 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
     everywhere else in the app, so they are the unit here too, and within a
     board the flavors that are OUT right now sort to the top.
   */
+  /*
+    THE RETIREMENT HOME: everything retired in the last day, on its own shelf
+    at the bottom with a one-tap way back. Retiring is not destruction —
+    nothing is ever deleted — but a mis-tap should not send you hunting
+    through a checkbox filter to undo it.
+  */
+  const retirementHome = useMemo(
+    () =>
+      flavors
+        .filter((f) => recentlyRetired(f))
+        .sort((a, b) => (b.retiredAt ?? 0) - (a.retiredAt ?? 0)),
+    [flavors],
+  );
+  const homeIds = useMemo(() => new Set(retirementHome.map((f) => f.id)), [retirementHome]);
+
   const groups = useMemo(
     () =>
       CATEGORIES.map((c) => ({
         ...c,
         items: visible
-          .filter((f) => f.category === c.key)
+          .filter((f) => f.category === c.key && !homeIds.has(f.id))
           .sort((a, b) => {
             const outA = (inCase[a.id]?.length ?? 0) > 0 ? 0 : 1;
             const outB = (inCase[b.id]?.length ?? 0) > 0 ? 0 : 1;
             return outA - outB || a.name.localeCompare(b.name);
           }),
       })).filter((g) => g.items.length > 0),
-    [visible, inCase],
+    [visible, inCase, homeIds],
   );
 
   async function save(patch: Record<string, unknown>, note = "Saved"): Promise<Flavor | null> {
@@ -288,14 +305,62 @@ export default function FlavorLibrary({ flavors, shops, inCase }: Props) {
           </ul>
         </section>
       ))}
-      {visible.length === 0 ? (
+      {visible.length === 0 && retirementHome.length === 0 ? (
         <p className="card mt-4 px-4 py-6 text-center text-sm text-ink-soft">
           No flavor matches that
           {!showRetired ? " — it might be retired; flip on “Show retired” above" : ""}.
         </p>
       ) : null}
+
+      {retirementHome.length > 0 ? (
+        <section aria-labelledby="lib-retired" className="mt-10 rounded-[--radius-panel] bg-cream-dim p-5">
+          <h2 id="lib-retired" className="font-[family-name:var(--font-display)] text-xl font-semibold">
+            The Retirement Home
+            <span className="ml-2 text-sm font-normal text-ink-soft">{retirementHome.length}</span>
+          </h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            Retired in the last day. Bring one back and it returns to the
+            library exactly as it was — after that it stays retired, and
+            “Show retired” above still finds it.
+          </p>
+          <ul className="mt-4 grid gap-2">
+            {retirementHome.map((f) => (
+              <li
+                key={f.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-[--radius-card] bg-white px-4 py-3"
+              >
+                <span>
+                  <span className="block font-semibold text-ink-soft line-through">{f.name}</span>
+                  <span className="block text-xs text-ink-soft">
+                    {CATEGORIES.find((c) => c.key === f.category)?.label} ·{" "}
+                    {hoursLeft(f.retiredAt)}
+                  </span>
+                </span>
+                <button
+                  onClick={() => save({ id: f.id, retired: false }, `${f.name} is back`)}
+                  disabled={working}
+                  className="btn !min-h-11 !px-5 !py-2 text-sm disabled:opacity-60"
+                >
+                  Bring it back
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
+}
+
+/** "23 hours left to undo" — plain, and never negative. */
+function hoursLeft(retiredAt?: number | null): string {
+  if (!retiredAt) return "recoverable";
+  const left = retiredAt + RETIRE_GRACE_MS - Date.now();
+  if (left <= 0) return "recovery window closed";
+  const hours = Math.floor(left / 3_600_000);
+  if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} left to undo`;
+  const mins = Math.max(1, Math.floor(left / 60_000));
+  return `${mins} minute${mins === 1 ? "" : "s"} left to undo`;
 }
 
 function FlavorEditor({
@@ -563,12 +628,20 @@ function FlavorEditor({
           {working ? "Saving…" : "Save"}
         </button>
         <button
-          onClick={() =>
+          onClick={() => {
+            if (
+              !flavor.retired &&
+              !window.confirm(
+                `Retire ${flavor.name}?\n\nIt comes off every board and moves to the Retirement Home at the bottom of the library. You have 24 hours to bring it back with one tap.`,
+              )
+            ) {
+              return;
+            }
             save(
               { id: flavor.id, retired: !flavor.retired },
-              flavor.retired ? `${flavor.name} is back` : `${flavor.name} retired`,
-            )
-          }
+              flavor.retired ? `${flavor.name} is back` : `${flavor.name} retired — recoverable for 24 hours`,
+            );
+          }}
           className="min-h-12 text-sm font-semibold text-ink-soft underline-offset-4 hover:text-berry hover:underline"
           disabled={working}
         >

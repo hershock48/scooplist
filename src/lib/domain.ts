@@ -50,6 +50,16 @@ export type Flavor = {
   sizesByShop?: Record<LocationKey, Size[]>;
   /** Retired flavors stay in the library (history, "bring it back") but out of pickers. */
   retired: boolean;
+  /**
+   * When it was retired, so a mistake is recoverable at a glance.
+   *
+   * Nothing is ever deleted — retiring only hides a flavor from the boards
+   * and the pickers. This timestamp exists so the library can put the last
+   * day's retirements on a shelf of their own, where an accidental tap is
+   * one tap back. Older ones are still there behind "Show retired"; they
+   * just stop shouting.
+   */
+  retiredAt?: number | null;
   createdAt: number;
 };
 
@@ -95,6 +105,13 @@ export function sizesFor(flavor: Flavor, shop: LocationKey): Size[] {
 /** True when any shop is priced differently from the default. */
 export function hasShopPricing(flavor: Flavor): boolean {
   return Object.values(flavor.sizesByShop ?? {}).some((s) => s && s.length > 0);
+}
+
+/** Retired within the recovery window — the shelf you can still undo from. */
+export const RETIRE_GRACE_MS = 24 * 60 * 60 * 1000;
+
+export function recentlyRetired(flavor: Flavor, now = Date.now()): boolean {
+  return Boolean(flavor.retired && flavor.retiredAt && now - flavor.retiredAt < RETIRE_GRACE_MS);
 }
 
 export function newId(prefix: string): string {

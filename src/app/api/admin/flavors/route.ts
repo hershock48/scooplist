@@ -105,6 +105,19 @@ export async function POST(request: Request) {
     sizes: cleanSizes(b.sizes) ?? existing?.sizes ?? DEFAULT_SIZES[category],
     sizesByShop: cleanShopSizes(b.sizesByShop) ?? existing?.sizesByShop,
     retired: typeof b.retired === "boolean" ? b.retired : existing?.retired ?? false,
+    /*
+      Stamped the moment it is retired and cleared the moment it comes back,
+      so the recovery shelf measures from the actual decision — not from
+      whenever the row was last touched for an unrelated edit.
+    */
+    retiredAt:
+      typeof b.retired === "boolean"
+        ? b.retired
+          ? existing?.retired && existing?.retiredAt
+            ? existing.retiredAt
+            : Date.now()
+          : null
+        : existing?.retiredAt ?? null,
     createdAt: existing?.createdAt ?? Date.now(),
   };
 

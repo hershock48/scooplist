@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import FlavorLibrary from "@/components/FlavorLibrary";
-import ScooplistMark from "@/components/Logo";
+import AppHeader from "@/components/AppHeader";
 import { blobToken } from "@/lib/blob";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
@@ -32,28 +32,7 @@ export default async function FlavorsPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6">
-      <header className="flex items-center justify-between gap-3">
-        <Link
-          href="/case"
-          className="flex items-center gap-2 font-[family-name:var(--font-display)] text-2xl font-bold text-berry"
-        >
-          <ScooplistMark size={30} />
-          Scooplist
-        </Link>
-        <nav className="flex items-center gap-4 text-sm font-semibold">
-          <Link href="/case" className="text-ink-soft underline-offset-4 hover:text-berry hover:underline">
-            The case
-          </Link>
-          <span aria-current="page" className="text-ink">
-            Library
-          </span>
-          <form method="post" action="/api/logout">
-            <button type="submit" className="text-ink-soft underline-offset-4 hover:text-berry hover:underline">
-              Sign out
-            </button>
-          </form>
-        </nav>
-      </header>
+      <AppHeader current="library" boardHref={`/board/${shops[0]?.id ?? ""}`} />
 
       <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-semibold">
         Every flavor you&apos;ve ever churned
