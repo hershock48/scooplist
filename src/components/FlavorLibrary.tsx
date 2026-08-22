@@ -34,6 +34,8 @@ type Props = {
   shops: ShopLocation[];
   categories: Category[];
   allergenOptions: string[];
+  /** Vertical-appropriate placeholder name (vertical.ts exampleItem). */
+  example: string;
   inCase: Record<string, string[]>;
 };
 
@@ -59,7 +61,7 @@ async function resizeToJpeg(file: File): Promise<{ data: string; contentType: st
   }
 }
 
-export default function FlavorLibrary({ flavors, shops, categories, allergenOptions, inCase }: Props) {
+export default function FlavorLibrary({ flavors, shops, categories, allergenOptions, example, inCase }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -198,7 +200,7 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
             id="lib-new"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Lemon Poppyseed"
+            placeholder={example}
             className="field max-w-xs"
           />
           <select

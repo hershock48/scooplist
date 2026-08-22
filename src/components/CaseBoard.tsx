@@ -42,6 +42,8 @@ type Props = {
   shops: ShopLocation[];
   categories: Category[];
   flavors: Flavor[];
+  /** Vertical-appropriate placeholder name (vertical.ts exampleItem). */
+  example: string;
   caseByShop: Record<string, CaseEntryLite[]>;
 };
 
@@ -52,7 +54,7 @@ type Sheet =
   | { kind: "new"; category?: CategoryKey }
   | null;
 
-export default function CaseBoard({ shops, categories, flavors, caseByShop }: Props) {
+export default function CaseBoard({ shops, categories, flavors, example, caseByShop }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -658,7 +660,7 @@ export default function CaseBoard({ shops, categories, flavors, caseByShop }: Pr
                 <input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Lemon Poppyseed"
+                  placeholder={example}
                   className="field mt-4"
                   aria-label="Flavor name"
                   autoFocus

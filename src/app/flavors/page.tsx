@@ -5,7 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import { blobToken } from "@/lib/blob";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
-import { allergens, categories } from "@/lib/vertical";
+import { allergens, categories, exampleItem } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
 
@@ -54,6 +54,7 @@ export default async function FlavorsPage() {
         shops={shops}
         categories={categories()}
         allergenOptions={allergens()}
+        example={exampleItem()}
         inCase={inCase}
       />
     </main>

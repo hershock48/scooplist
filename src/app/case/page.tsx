@@ -4,7 +4,7 @@ import CaseBoard from "@/components/CaseBoard";
 import AppHeader from "@/components/AppHeader";
 import { isAuthed } from "@/lib/auth";
 import { locations } from "@/lib/locations";
-import { categories } from "@/lib/vertical";
+import { categories, exampleItem } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
 import type { CaseStatus } from "@/lib/domain";
@@ -45,7 +45,13 @@ export default async function CasePage() {
         </p>
       ) : null}
 
-      <CaseBoard shops={shops} categories={categories()} flavors={flavors} caseByShop={caseByShop} />
+      <CaseBoard
+        shops={shops}
+        categories={categories()}
+        flavors={flavors}
+        example={exampleItem()}
+        caseByShop={caseByShop}
+      />
     </main>
   );
 }

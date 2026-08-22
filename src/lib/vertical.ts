@@ -62,6 +62,17 @@ const DEFAULT_SIZES: Record<string, Size[]> = {
   ],
 };
 
+/**
+ * The example name shown in "new item" placeholders. "Lemon Poppyseed" on a
+ * BAR deployment was the first thing the owner noticed, so the example
+ * follows the vertical like everything else here. Ice cream by default.
+ *
+ *   SCOOPLIST_EXAMPLE=Bell's Two Hearted
+ */
+export function exampleItem(): string {
+  return process.env.SCOOPLIST_EXAMPLE?.trim() || "Lemon Poppyseed";
+}
+
 export function categories(): Category[] {
   const raw = process.env.SCOOPLIST_CATEGORIES;
   if (!raw) return DEFAULT_CATEGORIES;
