@@ -41,6 +41,19 @@
     color: var(--color-ink);
   }
 
+  /*
+    Tailwind 4 dropped preflight's `button { cursor: pointer }`, so every
+    button in the app was showing the arrow — it read as "not clickable" on
+    anything that looks like a link rather than a filled button. Put it back,
+    and leave disabled controls alone: a pointer on a dead button is a lie.
+  */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-berry);
     outline-offset: 3px;

@@ -22,7 +22,7 @@ const body = Figtree({
 
 export const metadata: Metadata = {
   title: {
-    default: "Scooplist — what's in the case, always current",
+    default: "Scooplist — flavor boards, fresh daily",
     template: "%s | Scooplist",
   },
   description:

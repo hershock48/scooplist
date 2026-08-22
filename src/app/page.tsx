@@ -19,19 +19,23 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 py-14 text-center">
+      {/* Phone keeps glazedweb's 165px; desktop grows past its 230px, because
+          here the mark IS the page rather than sharing a two-column hero. */}
       <ScooplistMark
         animated
-        className="h-auto w-[165px] sm:w-[230px]"
+        className="h-auto w-[165px] sm:w-[230px] lg:w-[300px]"
       />
-      <p className="mt-1 font-[family-name:var(--font-display)] text-5xl font-bold tracking-tight text-berry sm:text-6xl">
+      <h1 className="mt-1 font-[family-name:var(--font-display)] text-5xl font-bold tracking-tight text-berry sm:text-6xl lg:text-8xl">
         Scooplist
-      </p>
-      <h1 className="mt-5 font-[family-name:var(--font-display)] text-3xl font-semibold leading-tight sm:text-4xl">
-        What&apos;s in the case, always current.
       </h1>
-      <p className="mt-4 max-w-md text-lg leading-relaxed text-ink-soft">
-        Blow through a tub, tap it out, tap the next flavor in. The website,
-        the TV board, and the counter menu update themselves — nobody calls
+      {/* The tagline answers glazedweb's "Websites, fresh daily." on purpose:
+          same cadence, so the two read as one studio. */}
+      <p className="mt-2 font-[family-name:var(--font-display)] text-xl font-semibold text-ink sm:text-2xl lg:text-3xl">
+        Flavor boards, fresh daily.
+      </p>
+      <p className="mt-5 max-w-md text-lg leading-relaxed text-ink-soft lg:max-w-lg lg:text-xl">
+        Blow through a tub, tap it out, tap the next flavor in. Your website,
+        your TV board, and your counter menu update themselves — nobody calls
         the web person.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
