@@ -152,8 +152,34 @@ const memoryStore: Store = {
 
 /* ----------------------------- postgres ----------------------------- */
 
+/**
+ * The env var actually holding the database URL, by name.
+ *
+ * Plain DATABASE_URL / POSTGRES_URL first. But the Vercel/Neon integration
+ * injects PREFIXED names in real situations (observed on the Cascarelli's
+ * install: DATABASE_CASCARELLIS_DATABASE_URL, with the connection's prefix
+ * box empty and no dashboard path to rename it), and asking an operator to
+ * hand-copy a secret between rows of the env screen cost a full evening.
+ * So: accept any *_DATABASE_URL, then any *_POSTGRES_URL. The exact-suffix
+ * match keeps the sibling variants out (…_URL_UNPOOLED, …_NON_POOLING,
+ * …_PRISMA_URL, …_URL_NO_SSL, …_AUTH_URL all end differently); keys are
+ * sorted so two candidates resolve the same way on every boot.
+ */
+export function connectionVar(): string | null {
+  const env = process.env;
+  if (env.DATABASE_URL) return "DATABASE_URL";
+  if (env.POSTGRES_URL) return "POSTGRES_URL";
+  const keys = Object.keys(env).sort();
+  return (
+    keys.find((k) => k.endsWith("_DATABASE_URL") && env[k]) ??
+    keys.find((k) => k.endsWith("_POSTGRES_URL") && env[k]) ??
+    null
+  );
+}
+
 function connectionString(): string | undefined {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  const name = connectionVar();
+  return name ? process.env[name] : undefined;
 }
 
 type PgPool = {

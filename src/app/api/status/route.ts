@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { locations } from "@/lib/locations";
 import { blobToken } from "@/lib/blob";
-import { getStore } from "@/lib/store";
+import { connectionVar, getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +54,9 @@ export async function GET() {
         BLOB_STORE_ID: Boolean(process.env.BLOB_STORE_ID),
         DATABASE_URL: Boolean(process.env.DATABASE_URL),
         POSTGRES_URL: Boolean(process.env.POSTGRES_URL),
+        /* The var the store actually resolved, prefixed names included —
+           name only, never the value. null = genuinely no database. */
+        resolvedDatabaseVar: connectionVar(),
         SCOOPLIST_PIN: Boolean(process.env.SCOOPLIST_PIN),
         SCOOPLIST_SECRET: Boolean(process.env.SCOOPLIST_SECRET),
         otherBlobKeys: Object.keys(process.env).filter(
