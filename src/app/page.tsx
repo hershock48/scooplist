@@ -37,9 +37,23 @@ export default async function Home() {
         Menu, Tap, Specials boards, one engine. No JS or reduced motion =
         the static "Flavor" line, complete.
       */}
-      <p className="mt-2 font-[family-name:var(--font-display)] text-xl font-semibold text-ink sm:text-2xl lg:text-3xl">
-        <FlipWord words={["Flavor", "Menu", "Tap", "Specials"]} /> boards that
-        taste like the truth.
+      {/*
+        THE WRAP IS HARD-CODED, never natural. The rolling word changes the
+        line's width every 1.8s, and any natural wrap point turns that into
+        a line-count change at SOME viewport (free width re-wrapped at
+        desktop; even per-word width found a viewport around 430px where
+        "Tap" fit on one line and "Specials" did not). So: below lg the
+        sentence is always two lines, broken after "boards"; at lg+ it is
+        always one, nowrap, allowed to run past the max-w-xl column (~615px
+        against a 1024+ viewport, so it never overflows the page, and the
+        flex column keeps it centered). The width is then free to ease.
+      */}
+      <p className="mt-2 font-[family-name:var(--font-display)] text-xl font-semibold text-ink sm:text-2xl lg:text-3xl lg:whitespace-nowrap">
+        <span className="whitespace-nowrap">
+          <FlipWord words={["Flavor", "Menu", "Tap", "Specials"]} /> boards
+        </span>{" "}
+        <br aria-hidden className="lg:hidden" />
+        <span className="whitespace-nowrap">that taste like the truth.</span>
       </p>
       {/*
         The explainer paragraph that used to sit here is gone at Kevin's call.

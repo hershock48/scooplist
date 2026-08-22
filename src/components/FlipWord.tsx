@@ -14,11 +14,18 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
  *    the word's own baseline and descenders never clip; only the LEAVING
  *    word is absolutely positioned, riding up and out under overflow:
  *    hidden (the keyframes live in globals.css, .sl-flip-*).
- *  - The container's width is measured per word and transitioned, so
- *    "Tap" does not sit in a "Specials"-wide hole in a centered line.
- *    Until measurement lands the width is auto, which is also the no-JS
- *    render: the static first word, a complete page (glaze.md rule 1 of
- *    motion).
+ *  - The slot's width is measured per word and transitioned. Two rejected
+ *    versions bracket why: free width + natural wrapping re-wrapped the
+ *    sentence when the word changed ("Menu" fit one line, "Specials"
+ *    broke to two, the layout breathed every 2 seconds); a slot fixed at
+ *    the widest word kept the lines stable but parked "Tap" in a
+ *    "Specials"-wide hole that read as a typo, rendered and seen. The
+ *    resolution lives in the PAGE, not here: the sentence hard-breaks
+ *    after "boards" below lg and runs nowrap at lg+, so the line count
+ *    is constant at every viewport no matter what the width does, and
+ *    the width is free to ease. Until measurement lands the width is
+ *    auto, which is also the no-JS render: the static first word, a
+ *    complete page (glaze.md rule 1 of motion).
  *  - Reduced motion: the interval never starts, the first word stands.
  *    Checked here rather than only in CSS because stopping the swap beats
  *    snapping it.
@@ -46,13 +53,13 @@ export default function FlipWord({ words, className = "" }: { words: string[]; c
         setLeaving(cur);
         return (cur + 1) % words.length;
       });
-    }, 2600);
+    }, 1800);
     return () => clearInterval(tick);
   }, [words.length]);
 
   useEffect(() => {
     if (leaving === null) return;
-    const id = setTimeout(() => setLeaving(null), 500);
+    const id = setTimeout(() => setLeaving(null), 360);
     return () => clearTimeout(id);
   }, [leaving]);
 
@@ -72,7 +79,7 @@ export default function FlipWord({ words, className = "" }: { words: string[]; c
         style={{
           clipPath: "inset(0)",
           width: widths ? `${Math.ceil(widths[idx])}px` : undefined,
-          transition: "width 0.45s cubic-bezier(0.22, 1, 0.36, 1)",
+          transition: "width 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
         }}
       >
         <span key={idx} className="sl-flip-in block whitespace-nowrap">
@@ -84,8 +91,12 @@ export default function FlipWord({ words, className = "" }: { words: string[]; c
           </span>
         ) : null}
         {/* Invisible measurer: every word rendered once, in this exact
-            font context, so the width transition has real numbers. */}
-        <span ref={measureRef} className="pointer-events-none invisible absolute left-0 top-0 whitespace-nowrap">
+            font context, so the width transition has real numbers. FIXED
+            and hung off the LEFT edge: clip-path clips paint, not layout,
+            so an absolute measurer wider than the slot still fed
+            document.scrollWidth (a 6px page overflow at 320, measured);
+            leftward overflow is the side scrollWidth never counts. */}
+        <span ref={measureRef} className="pointer-events-none invisible fixed top-0 -left-[9999px] whitespace-nowrap">
           {words.map((w) => (
             <span key={w} className="inline-block">
               {w}

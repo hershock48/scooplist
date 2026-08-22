@@ -145,8 +145,8 @@
 /* The tagline's rolling first word (FlipWord.tsx): the new word rides up
    into place while the old one leaves through the top. 110% so a descender
    is fully clear of the clip before it parks. */
-.sl-flip-in { animation: sl-flip-in 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
-.sl-flip-out { animation: sl-flip-out 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+.sl-flip-in { animation: sl-flip-in 0.32s cubic-bezier(0.22, 1, 0.36, 1); }
+.sl-flip-out { animation: sl-flip-out 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
 @keyframes sl-flip-in {
   from { transform: translateY(110%); }
   to { transform: translateY(0); }
