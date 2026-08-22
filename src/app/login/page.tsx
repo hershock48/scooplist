@@ -17,13 +17,14 @@ export default async function LoginPage({
   const { bad, locked } = await searchParams;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
-      <p className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-2xl font-bold text-berry">
-        <ScooplistMark size={40} animated />
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center px-6 text-center">
+      {/* Same stack as the landing, smaller: mark up top, name beneath. */}
+      <ScooplistMark animated className="h-auto w-[104px]" />
+      <p className="mt-1 font-[family-name:var(--font-display)] text-3xl font-bold text-berry">
         Scooplist
       </p>
       <h1 className="mt-3 text-xl font-semibold">Shop PIN</h1>
-      <form method="post" action="/api/login" className="mt-4">
+      <form method="post" action="/api/login" className="mt-4 w-full">
         <input
           name="pin"
           type="password"
