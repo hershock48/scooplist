@@ -625,6 +625,12 @@ function FlavorEditor({
         </div>
       </fieldset>
 
+      {/* Per-shop pricing only exists when there is more than one shop: on a
+          single-location install (Cascarelli's) an override for the only
+          shop IS the default, so the checkbox was pure noise. The
+          hasShopPricing escape keeps any already-saved override visible
+          rather than letting hidden data ride along invisibly. */}
+      {shops.length > 1 || hasShopPricing(flavor) ? (
       <div className="mt-4">
         <label className="flex min-h-12 cursor-pointer items-center gap-2 text-sm font-semibold">
           <input
@@ -667,6 +673,7 @@ function FlavorEditor({
           </p>
         )}
       </div>
+      ) : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <label className="btn-ghost cursor-pointer">
