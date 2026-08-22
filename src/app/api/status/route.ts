@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { locations } from "@/lib/locations";
-import { blobToken } from "@/lib/blob";
+import { blobToken, blobTokenVar } from "@/lib/blob";
 import { connectionVar, getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -51,6 +51,9 @@ export async function GET() {
       */
       env: {
         BLOB_READ_WRITE_TOKEN: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+        /* Same contract as resolvedDatabaseVar: the NAME the blob resolver
+           picked, never the value. */
+        resolvedBlobVar: blobTokenVar(),
         BLOB_STORE_ID: Boolean(process.env.BLOB_STORE_ID),
         DATABASE_URL: Boolean(process.env.DATABASE_URL),
         POSTGRES_URL: Boolean(process.env.POSTGRES_URL),

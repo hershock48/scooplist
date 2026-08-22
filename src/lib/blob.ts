@@ -3,18 +3,28 @@ import "server-only";
 /**
  * Find the Vercel Blob token whatever Vercel decided to call it.
  *
- * Connecting a Blob store injects `BLOB_READ_WRITE_TOKEN`, UNLESS the store
- * carries a custom name/prefix, in which case the variable arrives as
- * e.g. `SCOOPLIST_BLOB_READ_WRITE_TOKEN`. The first deploy hit exactly that:
- * the store was connected, the app reported "no photo storage", and the
- * owner went looking for a second storage vendor he did not need. So: take
- * the standard name if present, otherwise any variable that ends in
- * `BLOB_READ_WRITE_TOKEN`.
+ * Connecting a Blob store injects `BLOB_READ_WRITE_TOKEN` - unless the
+ * store carries a name/prefix. Observed in the wild, two different shapes:
+ * a prefix PREPENDED (`SCOOPLIST_BLOB_READ_WRITE_TOKEN`, the True North
+ * install) and the prefix REPLACING the `BLOB` namespace entirely
+ * (`cas_READ_WRITE_TOKEN`, the Cascarelli's install - the store prefix
+ * substitutes for the default `BLOB`). Both times the app reported "no
+ * photo storage" with a working store attached. So: the standard name
+ * first, then anything ending `BLOB_READ_WRITE_TOKEN`, then anything
+ * ending `_READ_WRITE_TOKEN` - a suffix no other Vercel product uses.
  */
-export function blobToken(): string | undefined {
-  if (process.env.BLOB_READ_WRITE_TOKEN) return process.env.BLOB_READ_WRITE_TOKEN;
-  const key = Object.keys(process.env).find(
-    (k) => k.endsWith("BLOB_READ_WRITE_TOKEN") && process.env[k],
+export function blobTokenVar(): string | null {
+  const env = process.env;
+  if (env.BLOB_READ_WRITE_TOKEN) return "BLOB_READ_WRITE_TOKEN";
+  const keys = Object.keys(env).sort();
+  return (
+    keys.find((k) => k.endsWith("BLOB_READ_WRITE_TOKEN") && env[k]) ??
+    keys.find((k) => k.endsWith("_READ_WRITE_TOKEN") && env[k]) ??
+    null
   );
-  return key ? process.env[key] : undefined;
+}
+
+export function blobToken(): string | undefined {
+  const name = blobTokenVar();
+  return name ? process.env[name] : undefined;
 }
