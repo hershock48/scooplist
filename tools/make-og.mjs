@@ -17,12 +17,12 @@ const html = `<!doctype html>
        align-items:center;justify-content:center;font-family:Fraunces,Georgia,serif}
   .mark{width:290px;height:290px;margin-bottom:6px}
   h1{font-size:96px;font-weight:700;color:#B93A60;letter-spacing:-2px;line-height:1}
-  p{font-size:38px;font-weight:600;color:#221D27;margin-top:14px}
+  p{font-size:34px;font-weight:600;color:#221D27;margin-top:14px}
 </style></head>
 <body>
   <div class="mark">${mark.replace('viewBox="0 0 64 64"', 'viewBox="0 0 64 64" width="290" height="290"')}</div>
   <h1>Scooplist</h1>
-  <p>Flavor boards, fresh daily.</p>
+  <p>Flavor boards that taste like the truth.</p>
 </body></html>`;
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM });

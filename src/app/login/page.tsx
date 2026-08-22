@@ -29,7 +29,7 @@ export default async function LoginPage({
         Scooplist
       </p>
       <p className="mt-1.5 font-[family-name:var(--font-display)] text-lg font-semibold text-ink sm:text-xl">
-        Flavor boards, fresh daily.
+        Flavor boards that taste like the truth.
       </p>
       <h1 className="mt-7 text-xl font-semibold">Shop PIN</h1>
       <form method="post" action="/api/login" className="mt-3 w-full">

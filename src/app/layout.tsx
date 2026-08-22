@@ -22,7 +22,7 @@ const body = Figtree({
 
 export const metadata: Metadata = {
   title: {
-    default: "Scooplist — flavor boards, fresh daily",
+    default: "Scooplist — flavor boards that taste like the truth",
     template: "%s | Scooplist",
   },
   description:
@@ -30,13 +30,13 @@ export const metadata: Metadata = {
   /*
     The share card, in glazedweb's own composition: cream field, the mark
     large and centered, the name and tagline beneath. Regenerate it with
-    scratchpad/make-og.mjs whenever the mark or the tagline changes — it is
+    tools/make-og.mjs whenever the mark or the tagline changes — it is
     a rendered PNG, and you cannot grep an image.
   */
   openGraph: {
     type: "website",
     siteName: "Scooplist",
-    title: "Scooplist — flavor boards, fresh daily",
+    title: "Scooplist — flavor boards that taste like the truth",
     description:
       "Blow through a tub at 2:15. By 2:16 the website, the TV board, and the sign over the counter have all caught up.",
     images: [
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Scooplist: a pink scoop with sprinkles on a waffle cone, green glaze dripping off it, over the line Flavor boards, fresh daily.",
+        alt: "Scooplist: a pink scoop with sprinkles on a waffle cone, green glaze dripping off it, over the line Flavor boards that taste like the truth.",
       },
     ],
   },

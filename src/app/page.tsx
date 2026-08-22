@@ -28,10 +28,14 @@ export default async function Home() {
       <h1 className="mt-1 font-[family-name:var(--font-display)] text-5xl font-bold tracking-tight text-berry sm:text-6xl lg:text-8xl">
         Scooplist
       </h1>
-      {/* The tagline answers glazedweb's "Websites, fresh daily." on purpose:
-          same cadence, so the two read as one studio. */}
+      {/*
+        Kevin's line, and it beats the one it replaced: "fresh daily" was
+        borrowed from glazedweb's cadence, while this names what the product
+        actually sells — a board that is RIGHT. Everything else here is
+        plumbing in service of that one claim.
+      */}
       <p className="mt-2 font-[family-name:var(--font-display)] text-xl font-semibold text-ink sm:text-2xl lg:text-3xl">
-        Flavor boards, fresh daily.
+        Flavor boards that taste like the truth.
       </p>
       {/*
         The pitch is a scene, not a feature list: a real thing that happens at
