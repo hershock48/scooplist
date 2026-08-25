@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/auth";
+import { DEFAULT_ORG, currentOrg } from "@/lib/org";
 import { blobToken } from "@/lib/blob";
 
 export const runtime = "nodejs";
@@ -17,7 +17,8 @@ export const runtime = "nodejs";
 const MAX_BASE64 = 1_500_000; // ~1.1MB decoded; client-side resize keeps real uploads far below.
 
 export async function POST(request: Request) {
-  if (!(await isAuthed())) {
+  const org = await currentOrg();
+  if (!org) {
     return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   }
 
@@ -48,7 +49,11 @@ export async function POST(request: Request) {
   if (token) {
     const { put } = await import("@vercel/blob");
     const safe = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const blob = await put(`flavors/${Date.now()}-${safe}`, Buffer.from(data, "base64"), {
+    // Org uploads get their own prefix in the shared blob store; legacy
+    // installs keep the flat keys their existing photos already live under
+    // (each has its own store, so there is nothing to separate there).
+    const prefix = org.slug === DEFAULT_ORG ? "" : `${org.slug}/`;
+    const blob = await put(`${prefix}flavors/${Date.now()}-${safe}`, Buffer.from(data, "base64"), {
       access: "public",
       contentType,
       token,

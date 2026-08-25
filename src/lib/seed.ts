@@ -3,7 +3,8 @@ import "server-only";
 import { newId, type Allergen, type CategoryKey, type Flavor } from "@/lib/domain";
 import { resolveVertical, sizesForCategory, type ResolvedVertical } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
-import { locations } from "@/lib/locations";
+import { orgBySlug } from "@/lib/org";
+import type { ShopLocation } from "@/lib/locations";
 import { BAR_SEED, BAR_SEED_KEYS } from "@/lib/seed-bar";
 
 /**
@@ -68,27 +69,34 @@ const SEED: SeedRow[] = [
   ["Strawberry Lemonade Sorbet", "dairyfree"],
 ];
 
-/**
- * Forget this process's "already decided about seeding" flag. The setup
- * route calls it when the vertical changes: the decision was made against
- * the OLD config (a tavern that seeds nothing, say), and the new one
- * (scoops) deserves a fresh look. Without this, choosing scoops after
- * tavern on one warm instance silently skipped the ice cream seed.
- */
-export function resetSeedGuard(): void {
-  const g = globalThis as typeof globalThis & { __scooplistSeeded?: boolean };
-  g.__scooplistSeeded = false;
+/** Per-org "already decided about seeding" flags for this process. The
+    pre-org shape was one boolean; a Set of org ids replaces it, with an
+    instanceof guard on the hot-reload seam between versions. */
+function seededSet(): Set<string> {
+  const g = globalThis as typeof globalThis & { __scooplistSeeded?: Set<string> | boolean };
+  if (!(g.__scooplistSeeded instanceof Set)) g.__scooplistSeeded = new Set();
+  return g.__scooplistSeeded;
 }
 
-export async function seedIfEmpty(): Promise<void> {
+/**
+ * Forget one org's "already decided about seeding" flag. The setup route
+ * (and org creation) calls it when the vertical changes: the decision was
+ * made against the OLD config (a tavern that seeds nothing, say), and the
+ * new one (scoops) deserves a fresh look. Without this, choosing scoops
+ * after tavern on one warm instance silently skipped the ice cream seed.
+ */
+export function resetSeedGuard(orgId: string): void {
+  seededSet().delete(orgId);
+}
+
+export async function seedIfEmpty(orgId: string): Promise<void> {
   /*
     Three layers, cheapest first: a per-process flag (free after the first
     hit), a SELECT 1 probe (never the full jsonb library, inline photos make
     that megabytes), and the store's once() guard with a re-check inside, so
     two cold instances racing a fresh database cannot both seed it.
   */
-  const g = globalThis as typeof globalThis & { __scooplistSeeded?: boolean };
-  if (g.__scooplistSeeded) return;
+  if (seededSet().has(orgId)) return;
 
   /*
     Which vertical's demo data fits this deployment:
@@ -108,42 +116,49 @@ export async function seedIfEmpty(): Promise<void> {
     - Anything else (tavern preset, coffee, other, unrecognized env
       categories): start empty.
   */
-  const v = await resolveVertical();
+  const v = await resolveVertical(orgId);
   if (v.setupPending) return; // NOT marked seeded: setup will call again.
+
+  // Shops come from the org (legacy's implicit org carries the env list),
+  // so a seed can never write into another tenant's locations.
+  const shops = (await orgBySlug(orgId))?.locations ?? [];
+  if (shops.length === 0) {
+    seededSet().add(orgId);
+    return;
+  }
 
   let seedFn: (() => Promise<void>) | null = null;
   if (v.preset === "scoops") {
-    seedFn = () => seed(v);
+    seedFn = () => seed(orgId, v, shops);
   } else {
     const keys = new Set(v.categories.map((c) => c.key));
-    seedFn = BAR_SEED_KEYS.every((k) => keys.has(k)) ? seedBar : null;
+    seedFn = BAR_SEED_KEYS.every((k) => keys.has(k)) ? () => seedBar(orgId, shops) : null;
   }
   if (!seedFn) {
-    g.__scooplistSeeded = true;
+    seededSet().add(orgId);
     return;
   }
   const run = seedFn;
 
   const store = getStore();
-  if (await store.hasAnyFlavors()) {
-    g.__scooplistSeeded = true;
+  if (await store.hasAnyFlavors(orgId)) {
+    seededSet().add(orgId);
     return;
   }
 
-  await store.once(async () => {
-    if (await store.hasAnyFlavors()) return;
+  await store.once(orgId, async () => {
+    if (await store.hasAnyFlavors(orgId)) return;
     await run();
   });
-  g.__scooplistSeeded = true;
+  seededSet().add(orgId);
 }
 
 /** The tavern seed: every row into the library and every shop's case, in
     menu order (positions set, so the boards match the printed lists rather
     than going alphabetical). */
-async function seedBar(): Promise<void> {
+async function seedBar(orgId: string, shops: ShopLocation[]): Promise<void> {
   const store = getStore();
   const now = Date.now();
-  const shops = locations();
 
   const ids: string[] = [];
   for (const row of BAR_SEED) {
@@ -161,13 +176,13 @@ async function seedBar(): Promise<void> {
       retired: false,
       createdAt: now,
     };
-    await store.upsertFlavor(flavor);
+    await store.upsertFlavor(orgId, flavor);
     ids.push(flavor.id);
   }
 
   for (const shop of shops) {
     for (let i = 0; i < ids.length; i += 1) {
-      await store.addToCase({
+      await store.addToCase(orgId, {
         id: newId("case"),
         locationId: shop.id,
         flavorId: ids[i],
@@ -179,10 +194,9 @@ async function seedBar(): Promise<void> {
   }
 }
 
-async function seed(v: ResolvedVertical): Promise<void> {
+async function seed(orgId: string, v: ResolvedVertical, shops: ShopLocation[]): Promise<void> {
   const store = getStore();
   const now = Date.now();
-  const shops = locations();
   const ids: { id: string; category: CategoryKey }[] = [];
 
   for (const [name, category, allergens, description, producer] of SEED) {
@@ -199,17 +213,21 @@ async function seed(v: ResolvedVertical): Promise<void> {
       retired: false,
       createdAt: now,
     };
-    await store.upsertFlavor(flavor);
+    await store.upsertFlavor(orgId, flavor);
     ids.push({ id: flavor.id, category });
   }
 
+  // The soft serve machine is Marshall's (Choose Marshall article), the
+  // one seeded per-shop difference, and the demo's proof the app
+  // understands that shops differ. It is True North's machine, so the rule
+  // only applies when a shop slugged "marshall" exists; an org seeding the
+  // scoops demo with other shop names gets soft serve everywhere rather
+  // than nowhere.
+  const hasMarshall = shops.some((s) => s.id === "marshall");
   for (const shop of shops) {
     for (const { id, category } of ids) {
-      // The soft serve machine is Marshall's (Choose Marshall article),
-      // the one seeded per-shop difference, and the demo's proof the app
-      // understands that shops differ.
-      if (category === "softserve" && shop.id !== "marshall") continue;
-      await store.addToCase({
+      if (category === "softserve" && hasMarshall && shop.id !== "marshall") continue;
+      await store.addToCase(orgId, {
         id: newId("case"),
         locationId: shop.id,
         flavorId: id,

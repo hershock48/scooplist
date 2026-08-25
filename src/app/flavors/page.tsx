@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import FlavorLibrary from "@/components/FlavorLibrary";
 import AppHeader from "@/components/AppHeader";
 import { blobToken } from "@/lib/blob";
-import { isAuthed } from "@/lib/auth";
-import { locations } from "@/lib/locations";
+import { boardHref, currentOrg, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
@@ -12,27 +11,30 @@ import { getStore } from "@/lib/store";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const v = await resolveVertical();
+  const org = await currentOrg();
+  if (!org) return { title: "The library" };
+  const v = await resolveVertical(org.slug);
   return { title: v.voice === "neutral" ? "The library" : "Flavor library" };
 }
 
 export default async function FlavorsPage() {
-  if (!(await isAuthed())) redirect("/login");
+  const org = await currentOrg();
+  if (!org) redirect("/login");
 
-  const v = await resolveVertical();
+  const v = await resolveVertical(org.slug);
   if (v.setupPending) redirect("/setup");
 
-  await seedIfEmpty();
+  await seedIfEmpty(org.slug);
   const store = getStore();
-  const flavors = await store.listFlavors();
+  const flavors = await store.listFlavors(org.slug);
   /*
     Which shops have each flavor out right now. The library without this is a
     filing cabinet; with it, it is a picture of the business.
   */
-  const shops = locations();
+  const shops = org.locations;
   const inCase: Record<string, string[]> = {};
   for (const shop of shops) {
-    for (const entry of await store.listCase(shop.id)) {
+    for (const entry of await store.listCase(org.slug, shop.id)) {
       (inCase[entry.flavorId] ??= []).push(shop.id);
     }
   }
@@ -42,9 +44,10 @@ export default async function FlavorsPage() {
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6">
       <AppHeader
         current="library"
-        boardHref={`/board/${shops[0]?.id ?? ""}`}
+        boardHref={boardHref(org, shops[0]?.id ?? "")}
         voice={v.voice}
         nouns={v.nouns}
+        orgName={orgMode() ? org.name : undefined}
       />
 
       <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-semibold">

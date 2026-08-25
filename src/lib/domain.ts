@@ -13,6 +13,16 @@
 export type CategoryKey = string;
 export type Allergen = string;
 
+/**
+ * The sentinel org id for single-tenant deployments (True North,
+ * Cascarelli's, local demos). Every row they ever wrote gets this org_id
+ * backfilled by the store's DDL, so legacy queries keep returning exactly
+ * the rows they always did. It lives HERE, not in org.ts, because both
+ * org.ts and store.ts need it and org.ts imports store.ts; a copy in each
+ * would be the two-homes bug waiting to disagree.
+ */
+export const DEFAULT_ORG = "default";
+
 export type Size = { label: string; price: string };
 
 /** The shops, as the domain knows them. locations.ts owns the real list. */

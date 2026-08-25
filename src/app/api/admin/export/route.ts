@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/auth";
-import { locations } from "@/lib/locations";
+import { DEFAULT_ORG, currentOrg } from "@/lib/org";
 import { getStore } from "@/lib/store";
 
 export const runtime = "nodejs";
@@ -8,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * THE WAY OUT. The client's entire library and case history, one JSON file,
- * admin-gated.
+ * admin-gated, and scoped to the signed-in org: on the shared deployment
+ * "the client's data" means THEIR rows, never the database.
  *
  * It exists for two reasons. Operationally, everything lives in one Neon
  * free-tier database with no other backup path, and this turns "we lost the
@@ -19,19 +19,27 @@ export const dynamic = "force-dynamic";
  * it without archaeology.
  */
 export async function GET() {
-  if (!(await isAuthed())) {
+  const org = await currentOrg();
+  if (!org) {
     return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   }
 
   const store = getStore();
-  const [flavors, entries] = await Promise.all([store.listFlavors(), store.listEntries()]);
+  const [flavors, entries] = await Promise.all([
+    store.listFlavors(org.slug),
+    store.listEntries(org.slug),
+  ]);
 
   const stamp = new Date().toISOString().slice(0, 10);
+  const isOrg = org.slug !== DEFAULT_ORG;
   return NextResponse.json(
     {
       exportedAt: Date.now(),
       backend: store.backend,
-      locations: locations(),
+      // Additive field, org deployments only; legacy exports stay
+      // byte-compatible with every file already sitting in a backup folder.
+      ...(isOrg ? { org: { slug: org.slug, name: org.name } } : {}),
+      locations: org.locations,
       flavors,
       // Open AND closed: the closed entries are the history, which is most
       // of the point of backing this up.
@@ -39,7 +47,7 @@ export async function GET() {
     },
     {
       headers: {
-        "Content-Disposition": `attachment; filename="scooplist-export-${stamp}.json"`,
+        "Content-Disposition": `attachment; filename="scooplist-export-${isOrg ? `${org.slug}-` : ""}${stamp}.json"`,
         "Cache-Control": "no-store",
       },
     },

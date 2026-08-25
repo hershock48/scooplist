@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 /**
@@ -25,6 +25,22 @@ import { cookies } from "next/headers";
  *
  * 30-day cookie, not devine's 18 hours: this lives on the owner's own
  * phone, and re-typing a PIN every morning is how boards go stale.
+ *
+ * TWO COOKIE FORMATS since the org deployment mode arrived (org.ts):
+ *
+ *  legacy   HMAC-SHA256(secret, pin), hex. Unchanged byte for byte since
+ *           day one, so deploying the org-capable build never signs the
+ *           live installs out.
+ *  org      "2.{slug}.{hmac}" where the hmac covers slug + the STORED pin
+ *           hash. Binding to the hash rather than the plaintext means
+ *           rotating an org's PIN invalidates its sessions, and the
+ *           plaintext PIN never enters the cookie math at all. The "2."
+ *           prefix is the format discriminator; a legacy value can never
+ *           start with it (hex has no dots).
+ *
+ * Org PINs are stored as salted scrypt ("s1$salt$hash"), never plaintext.
+ * The legacy single PIN stays an env var; it predates orgs and belongs to
+ * the deployment, not a database row.
  */
 
 const COOKIE = "scooplist_admin";
@@ -40,21 +56,63 @@ function cookieValue(): string {
   return createHmac("sha256", secret).update(pin).digest("hex");
 }
 
-function safeEqual(a: string, b: string): boolean {
+export function safeEqual(a: string, b: string): boolean {
   const ab = Buffer.from(a);
   const bb = Buffer.from(b);
   return ab.length === bb.length && timingSafeEqual(ab, bb);
 }
 
-export async function isAuthed(): Promise<boolean> {
-  const jar = await cookies();
-  const got = jar.get(COOKIE)?.value ?? "";
+/** The legacy cookie check, extracted so org.ts can route on cookie format. */
+export function isLegacyCookieValid(got: string): boolean {
   return got !== "" && safeEqual(got, cookieValue());
 }
 
-export async function setAuthCookie(): Promise<void> {
+export async function isAuthed(): Promise<boolean> {
   const jar = await cookies();
-  jar.set(COOKIE, cookieValue(), {
+  return isLegacyCookieValid(jar.get(COOKIE)?.value ?? "");
+}
+
+/* ------------------------------ org PINs ------------------------------ */
+
+/**
+ * scrypt over bcrypt/argon because it ships in node:crypto: no dependency,
+ * and a 4 to 12 digit PIN behind a 10-minute lockout does not need a
+ * tunable-cost arms race. The "s1$" prefix leaves room to change the
+ * scheme without guessing what an old hash is.
+ */
+export function hashPin(pin: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(pin, salt, 32).toString("hex");
+  return `s1$${salt}$${hash}`;
+}
+
+export function verifyPin(pin: string, stored: string): boolean {
+  const parts = stored.split("$");
+  if (parts.length !== 3 || parts[0] !== "s1") return false;
+  const hash = scryptSync(pin, parts[1], 32).toString("hex");
+  return safeEqual(hash, parts[2]);
+}
+
+/**
+ * Org mode always has SCOOPLIST_MASTER set (it IS the mode trigger, see
+ * org.ts), so there is always a real secret here; the legacy
+ * derive-from-pin fallback never applies to org cookies.
+ */
+function orgSecret(): string {
+  return process.env.SCOOPLIST_SECRET || process.env.SCOOPLIST_MASTER || "";
+}
+
+export function orgCookieValue(slug: string, pinHash: string): string {
+  const mac = createHmac("sha256", orgSecret()).update(`${slug}\n${pinHash}`).digest("hex");
+  return `2.${slug}.${mac}`;
+}
+
+/* ------------------------------ cookies ------------------------------- */
+
+/** No argument = the legacy value, today's behavior exactly. */
+export async function setAuthCookie(org?: { slug: string; pinHash: string }): Promise<void> {
+  const jar = await cookies();
+  jar.set(COOKIE, org ? orgCookieValue(org.slug, org.pinHash) : cookieValue(), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -81,27 +139,39 @@ function attempts(): Attempts {
   return g.__scooplistPinAttempts;
 }
 
-/** True while this address is locked out. */
-export function pinLocked(address: string): boolean {
-  const a = attempts().get(address);
+/**
+ * True while this key is locked out. Legacy keys are the bare address;
+ * org keys are "{slug}|{addr}", so an address gets five tries PER ORG.
+ * That multiplies an attacker's budget by the number of orgs they can
+ * name, which is acceptable at this product's threat level (same gate-
+ * not-a-vault doctrine as the header) and keeps one bar's fat-fingered
+ * PIN from locking a neighbor out of theirs.
+ */
+export function pinLocked(key: string): boolean {
+  const a = attempts().get(key);
   return !!a && a.lockedUntil > Date.now();
 }
 
-/** Check a submitted PIN, recording the outcome for the throttle. */
-export function checkPin(address: string, pin: string): boolean {
-  if (pinLocked(address)) return false;
-  const ok = safeEqual(pin.trim(), adminPin());
+/** Record one attempt's outcome for the throttle. */
+export function recordPinResult(key: string, ok: boolean): void {
   const map = attempts();
   if (ok) {
-    map.delete(address);
-    return true;
+    map.delete(key);
+    return;
   }
-  const a = map.get(address) ?? { fails: 0, lockedUntil: 0 };
+  const a = map.get(key) ?? { fails: 0, lockedUntil: 0 };
   a.fails += 1;
   if (a.fails >= MAX_FAILS) {
     a.lockedUntil = Date.now() + LOCK_MS;
     a.fails = 0;
   }
-  map.set(address, a);
-  return false;
+  map.set(key, a);
+}
+
+/** Check a submitted PIN against the legacy env PIN, throttle included. */
+export function checkPin(key: string, pin: string): boolean {
+  if (pinLocked(key)) return false;
+  const ok = safeEqual(pin.trim(), adminPin());
+  recordPinResult(key, ok);
+  return ok;
 }

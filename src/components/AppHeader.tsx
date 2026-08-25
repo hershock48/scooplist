@@ -25,6 +25,7 @@ export default function AppHeader({
   boardHref,
   voice = "scoops",
   nouns,
+  orgName,
 }: {
   current: "case" | "library" | "history" | "setup";
   boardHref: string;
@@ -32,6 +33,13 @@ export default function AppHeader({
   voice?: "scoops" | "neutral";
   /** The vertical's own words (presets.ts): case, cooler, board. */
   nouns?: VerticalNouns;
+  /**
+   * The signed-in org's name, org-mode deployments only. One browser holds
+   * one session, so whoever manages two shops switches by signing in
+   * again; this label is what keeps "which case am I editing" on screen
+   * the whole time instead of in their memory.
+   */
+  orgName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
@@ -84,6 +92,11 @@ export default function AppHeader({
       >
         <ScooplistMark size={30} />
         Scooplist
+        {orgName ? (
+          <span className="max-w-40 truncate text-base font-semibold text-ink-soft sm:max-w-56">
+            {orgName}
+          </span>
+        ) : null}
       </Link>
 
       {/* Roomy screens keep every destination one tap away. */}

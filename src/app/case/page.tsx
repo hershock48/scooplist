@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import CaseBoard from "@/components/CaseBoard";
 import AppHeader from "@/components/AppHeader";
-import { isAuthed } from "@/lib/auth";
-import { locations } from "@/lib/locations";
+import { boardHref, currentOrg, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
@@ -12,32 +11,36 @@ import type { CaseStatus } from "@/lib/domain";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const v = await resolveVertical();
+  const org = await currentOrg();
+  if (!org) return { title: "The case" };
+  const v = await resolveVertical(org.slug);
   return { title: `The ${v.nouns.surface}` };
 }
 
 export default async function CasePage() {
-  if (!(await isAuthed())) redirect("/login");
+  const org = await currentOrg();
+  if (!org) redirect("/login");
 
   /*
     First run on a fresh, unconfigured install: before anything else, ask
     what kind of business this is. resolveVertical only flags this when
     nothing configured the vertical AND the library is empty, so existing
-    installs (env-pinned, or full of flavors) never see it.
+    installs (env-pinned, or full of flavors) never see it. Orgs never see
+    it either: creation writes their vertical.
   */
-  const v = await resolveVertical();
+  const v = await resolveVertical(org.slug);
   if (v.setupPending) redirect("/setup");
 
-  await seedIfEmpty();
+  await seedIfEmpty(org.slug);
   const store = getStore();
-  const shops = locations();
-  const flavors = await store.listFlavors();
+  const shops = org.locations;
+  const flavors = await store.listFlavors(org.slug);
   const caseByShop: Record<
     string,
     { flavorId: string; addedAt: number; position?: number; status?: CaseStatus | null }[]
   > = {};
   for (const shop of shops) {
-    caseByShop[shop.id] = (await store.listCase(shop.id)).map((e) => ({
+    caseByShop[shop.id] = (await store.listCase(org.slug, shop.id)).map((e) => ({
       flavorId: e.flavorId,
       addedAt: e.addedAt,
       position: e.position,
@@ -49,9 +52,10 @@ export default async function CasePage() {
     <main className="mx-auto max-w-3xl px-4 pb-28 pt-6">
       <AppHeader
         current="case"
-        boardHref={`/board/${shops[0]?.id ?? ""}`}
+        boardHref={boardHref(org, shops[0]?.id ?? "")}
         voice={v.voice}
         nouns={v.nouns}
+        orgName={orgMode() ? org.name : undefined}
       />
 
       {/* Shop voice out front; the Vercel specifics live in the README for

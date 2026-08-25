@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/auth";
-import { locations } from "@/lib/locations";
+import { currentOrg } from "@/lib/org";
 import { newId, type Allergen, type CategoryKey, type Flavor, type Size } from "@/lib/domain";
 import { resolveVertical, sizesForCategory } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
@@ -18,15 +17,15 @@ function cleanSizes(v: unknown): Size[] | null {
 }
 
 /**
- * Per-shop price overrides. Only known shops are kept, a shop mapped to an
- * empty list means "back on the default price", and every list runs through
- * the same cleaner as the default so a shop cannot smuggle in a size with a
- * blank price.
+ * Per-shop price overrides. Only the org's own shops are kept, a shop
+ * mapped to an empty list means "back on the default price", and every
+ * list runs through the same cleaner as the default so a shop cannot
+ * smuggle in a size with a blank price.
  */
-function cleanShopSizes(v: unknown): Record<string, Size[]> | undefined {
+function cleanShopSizes(v: unknown, shopIds: string[]): Record<string, Size[]> | undefined {
   if (v === null) return {};
   if (typeof v !== "object" || Array.isArray(v)) return undefined;
-  const known = new Set(locations().map((l) => l.id));
+  const known = new Set(shopIds);
   const out: Record<string, Size[]> = {};
   for (const [shop, list] of Object.entries(v as Record<string, unknown>)) {
     if (!known.has(shop)) continue;
@@ -41,7 +40,8 @@ function cleanShopSizes(v: unknown): Record<string, Size[]> | undefined {
  * sizes so "add Blue Moon mid-rush" is two fields, not a pricing exercise.
  */
 export async function POST(request: Request) {
-  if (!(await isAuthed())) {
+  const org = await currentOrg();
+  if (!org) {
     return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   }
 
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   }
 
   const store = getStore();
-  const existing = b.id ? await store.getFlavor(clean(b.id, 60)) : null;
+  const existing = b.id ? await store.getFlavor(org.slug, clean(b.id, 60)) : null;
 
   const name = clean(b.name, 80) || existing?.name || "";
   if (!name) return NextResponse.json({ error: "The flavor needs a name." }, { status: 400 });
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
   // Validated against the CONFIGURED vertical, not a hardcoded ice cream
   // list; the deployment's config decides what a legal category or allergen is.
-  const v = await resolveVertical();
+  const v = await resolveVertical(org.slug);
   const cats = v.categories;
   const category = (cats.some((c) => c.key === b.category)
     ? (b.category as CategoryKey)
@@ -106,7 +106,8 @@ export async function POST(request: Request) {
     abv,
     photoUrl,
     sizes: cleanSizes(b.sizes) ?? existing?.sizes ?? sizesForCategory(v, category),
-    sizesByShop: cleanShopSizes(b.sizesByShop) ?? existing?.sizesByShop,
+    sizesByShop:
+      cleanShopSizes(b.sizesByShop, org.locations.map((l) => l.id)) ?? existing?.sizesByShop,
     retired: typeof b.retired === "boolean" ? b.retired : existing?.retired ?? false,
     /*
       Stamped the moment it is retired and cleared the moment it comes back,
@@ -124,6 +125,6 @@ export async function POST(request: Request) {
     createdAt: existing?.createdAt ?? Date.now(),
   };
 
-  await store.upsertFlavor(flavor);
+  await store.upsertFlavor(org.slug, flavor);
   return NextResponse.json({ ok: true, flavor });
 }

@@ -11,11 +11,16 @@
  * public write AND no login prerequisite. seedIfEmpty's own guards (process
  * flag, cheap probe, advisory lock) make repeated cold-start calls free and
  * race-safe, and a seed failure must never take the server down with it.
+ *
+ * LEGACY ONLY: the org-mode deployment (org.ts) seeds at org creation
+ * instead. A central boot has no org to seed and must never invent one.
  */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    const { DEFAULT_ORG, orgMode } = await import("@/lib/org");
+    if (orgMode()) return;
     const { seedIfEmpty } = await import("@/lib/seed");
-    await seedIfEmpty().catch((err) => {
+    await seedIfEmpty(DEFAULT_ORG).catch((err) => {
       console.error("scooplist: boot seed failed (will retry next cold start):", err);
     });
   }

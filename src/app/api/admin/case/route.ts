@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/auth";
-import { locationById } from "@/lib/locations";
+import { currentOrg } from "@/lib/org";
 import { newId, type CaseStatus } from "@/lib/domain";
 import { getStore } from "@/lib/store";
 
@@ -20,7 +19,8 @@ export const runtime = "nodejs";
  * positions in the order given, the wall's order.
  */
 export async function POST(request: Request) {
-  if (!(await isAuthed())) {
+  const org = await currentOrg();
+  if (!org) {
     return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   }
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const location = locationById(String(b.locationId ?? ""));
+  const location = org.locations.find((l) => l.id === String(b.locationId ?? "")) ?? null;
   if (!location) return NextResponse.json({ error: "Unknown shop." }, { status: 400 });
 
   const store = getStore();
@@ -49,22 +49,24 @@ export async function POST(request: Request) {
     if (ids.length === 0) {
       return NextResponse.json({ error: "Nothing to reorder." }, { status: 400 });
     }
-    await store.reorderCase(location.id, ids);
+    await store.reorderCase(org.slug, location.id, ids);
     return NextResponse.json({ ok: true });
   }
 
-  const flavor = await store.getFlavor(String(b.flavorId ?? ""));
+  // getFlavor is org-scoped, so a pasted id from another org misses here
+  // rather than putting a stranger's drink on this org's board.
+  const flavor = await store.getFlavor(org.slug, String(b.flavorId ?? ""));
   if (!flavor) return NextResponse.json({ error: "Unknown flavor." }, { status: 400 });
 
   if (b.action === "out") {
-    await store.closeCaseEntry(location.id, flavor.id, Date.now());
+    await store.closeCaseEntry(org.slug, location.id, flavor.id, Date.now());
     return NextResponse.json({ ok: true });
   }
 
   if (b.action === "status") {
     const status: CaseStatus | null =
       b.status === "low" || b.status === "ondeck" ? b.status : null;
-    await store.setCaseStatus(location.id, flavor.id, status);
+    await store.setCaseStatus(org.slug, location.id, flavor.id, status);
     return NextResponse.json({ ok: true });
   }
 
@@ -74,9 +76,9 @@ export async function POST(request: Request) {
     // The new entry lands at the END of the wall: one past the largest
     // existing position. Two racing adds can tie, which byCaseOrder breaks
     // alphabetically, harmless.
-    const open = await store.listCase(location.id);
+    const open = await store.listCase(org.slug, location.id);
     const positions = open.map((e) => e.position).filter((p): p is number => typeof p === "number");
-    await store.addToCase({
+    await store.addToCase(org.slug, {
       id: newId("case"),
       locationId: location.id,
       flavorId: flavor.id,

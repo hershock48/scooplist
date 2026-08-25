@@ -92,10 +92,14 @@ authority on the real configuration.
   one click in the dashboard and part of the hosting (same ruling as Neon, 
   nothing rented). The browser downscales before upload so a 4MB camera shot
   never crosses the wire.
-- **Locations are env config** (`SCOOPLIST_LOCATIONS=slug:Name,…`), so the
-  next client is a dashboard edit. Multi-tenant (accounts table, per-shop
-  PINs, a signup) is deliberately NOT built, single-tenant per deployment
-  until a second client proves the shape, the DeVine gating rule.
+- **Locations are env config on single-tenant installs**
+  (`SCOOPLIST_LOCATIONS=slug:Name,…`), so those deployments stay a
+  dashboard edit. Multi-tenant was deliberately NOT built "until a second
+  client proves the shape" (the DeVine gating rule); Cascarelli's proved
+  the second vertical and Copper AC was the third install, so the gate is
+  passed and org mode exists. See "One deployment, many shops" below. The
+  retired ruling stays here as a retraction on the record: the gate was
+  right, and so was walking through it when it tripped.
 - **The vertical is env config too** (`SCOOPLIST_CATEGORIES`,
   `SCOOPLIST_ALLERGENS`, `SCOOPLIST_SIZES`, see `.env.example` and
   `src/lib/vertical.ts`): categories, allergen chips, and default price
@@ -112,12 +116,49 @@ authority on the real configuration.
 - **The feed is versioned (`/api/v1/`)** because client sites will depend on
   it; breaking it breaks live menus. Additive changes only; a break means v2.
 
+## One deployment, many shops (org mode)
+
+The central deployment serves many organizations from one database. The
+mode rule lives in `src/lib/org.ts` and is opt-in: `SCOOPLIST_MASTER` set,
+`SCOOPLIST_LOCATIONS` and `SCOOPLIST_CATEGORIES` both unset. Legacy is the
+default, so deploying this code to the two live single-tenant installs
+changes nothing there (their databases self-migrate additively: an org_id
+column defaulting to 'default', a widened unique index, an orgs table
+nothing reads).
+
+The URL map, per org:
+
+- `/login/{org}` is the sign-in link Kevin hands the owner (plus their PIN)
+- `/board/{org}/{location}` is the TV board
+- `/api/v1/orgs/{org}/case/{location}` is the public feed, same JSON shape
+  and additive-only contract as the legacy `/api/v1/case/{location}`
+
+Creating an org (upsert, so a re-run rotates a PIN or edits locations):
+
+    $env:SCOOPLIST_MASTER = "<the master secret>"
+    node tools/create-org.mjs --url https://scooplist.glazedweb.com `
+      --slug copperac --name "Copper Athletic Club" --pin <pin> `
+      --preset tavern --categories "taps:On Tap,cocktails:Cocktails" `
+      --locations "marshall:Copper Athletic Club"
+
+`--categories` overrides the preset's boards; without it the preset's own
+list applies and seeding presets (scoops, or the full Cascarelli's-shaped
+bar contract) fill an empty library. Org config lives in the database
+(vertical in the settings table, locations on the org row); the env vars
+are legacy-install config and are ignored per-org on purpose, so one
+dashboard edit can never restyle every tenant at once.
+
+Verify with the same discipline as everything else: `npm run build` then
+`npm start` (never the dev server), and walk one org end to end: create,
+sign in, add a drink, see it on `/board/{org}/{location}` and in the feed.
+
 ## Wiring a client site
 
 Fetch the feed server-side with a short revalidate and treat it as
 unavailable-tolerant, keep rendering the last good copy (or a static
 fallback) if the feed errors. The truenorth repo is the reference
-integration.
+integration for legacy feeds; copperac (org feed, section-map template
+from glaze/assets/scooplist-feed/) is the reference for org feeds.
 
 ## Before this is a product
 
@@ -131,8 +172,11 @@ integration.
       ("Live: the boards render from Scooplist"), August 2026
 - [x] Case history view, `/history`, August 2026
 - [x] Export, `/api/admin/export`, August 2026
-- [ ] Second tenant → extract multi-tenancy, not before. (Cascarelli's as a
-      tap list is a SECOND DEPLOYMENT, which the env vars now cover; it is
-      deliberately not a reason to build accounts, see glaze/catalog.)
+- [x] Second tenant → extract multi-tenancy, not before. Gate passed:
+      Cascarelli's proved the second vertical, Copper AC was the third
+      install. Org mode shipped August 2026 (`SCOOPLIST_MASTER`, orgs as
+      data, per-org login links and feeds); the two single-tenant installs
+      stay on their own deployments, zero migration. Still deliberately
+      NOT built: signup, billing, real accounts.
 - [ ] QR counter menu page (the feed + a template; an evening)
 - [ ] "Tell me when it's back", customer flavor alerts; the Untappd hook

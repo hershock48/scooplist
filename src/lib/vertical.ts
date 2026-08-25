@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Size } from "@/lib/domain";
+import { DEFAULT_ORG, type Size } from "@/lib/domain";
 import {
   NEUTRAL_NOUNS,
   PRESETS,
@@ -10,6 +10,7 @@ import {
   type VerticalConfig,
   type VerticalNouns,
 } from "@/lib/presets";
+import { orgMode } from "@/lib/org";
 import { getStore } from "@/lib/store";
 
 export type { Category, VerticalConfig, VerticalNouns } from "@/lib/presets";
@@ -36,6 +37,11 @@ export type { Category, VerticalConfig, VerticalNouns } from "@/lib/presets";
  * while True North (unconfigured but full of flavors since before setup
  * existed) never sees it.
  *
+ * ORG MODE (org.ts) resolves per org and SKIPS the env layer entirely: the
+ * central deployment's dashboard vars must not bleed into every tenant at
+ * once, and an org's config always exists (creation writes it), so
+ * setupPending is never raised there. The legacy path above is untouched.
+ *
  * SERVER-SIDE ONLY (and now enforced with server-only: this file imports
  * the store). Pages and routes resolve once and hand plain fields to the
  * client components as props.
@@ -51,16 +57,20 @@ const CACHE_MS = 30_000;
 
 type Cache = { value: ResolvedVertical; at: number };
 
-function cacheBox(): { current: Cache | null } {
-  const g = globalThis as typeof globalThis & { __scooplistVertical?: { current: Cache | null } };
-  if (!g.__scooplistVertical) g.__scooplistVertical = { current: null };
+function cacheBox(): Map<string, Cache> {
+  const g = globalThis as typeof globalThis & { __scooplistVertical?: Map<string, Cache> };
+  // The pre-org shape was a single { current } box; a Map keyed by org id
+  // replaces it (instanceof guards the hot-reload seam between versions).
+  if (!g.__scooplistVertical || !(g.__scooplistVertical instanceof Map)) {
+    g.__scooplistVertical = new Map();
+  }
   return g.__scooplistVertical;
 }
 
 /** Call after saving the setting so THIS instance re-reads immediately;
     other warm instances catch up within CACHE_MS. */
-export function invalidateVertical(): void {
-  cacheBox().current = null;
+export function invalidateVertical(orgId: string): void {
+  cacheBox().delete(orgId);
 }
 
 /* ------------------------------ env layer ------------------------------ */
@@ -169,11 +179,33 @@ function validStored(v: unknown): VerticalConfig | null {
   };
 }
 
-export async function resolveVertical(): Promise<ResolvedVertical> {
+export async function resolveVertical(orgId: string): Promise<ResolvedVertical> {
   const box = cacheBox();
-  if (box.current && Date.now() - box.current.at < CACHE_MS) return box.current.value;
+  const hit = box.get(orgId);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
 
   let value: ResolvedVertical;
+
+  if (orgMode()) {
+    /*
+      Per-org: the stored config or the scoops defaults, nothing else. No
+      env layer (one dashboard var must not restyle every tenant), and no
+      setupPending (creation always writes a vertical, so there is no
+      first-run limbo to redirect into).
+    */
+    const store = getStore();
+    let stored: VerticalConfig | null = null;
+    try {
+      stored = validStored(await store.getSetting(orgId, SETTING_KEY));
+    } catch {
+      stored = null;
+    }
+    value = stored
+      ? { ...stored, source: "store", setupPending: false }
+      : { ...scoopsDefault(), source: "default", setupPending: false };
+    box.set(orgId, { value, at: Date.now() });
+    return value;
+  }
 
   const envCats = envCategories();
   if (envCats) {
@@ -201,7 +233,7 @@ export async function resolveVertical(): Promise<ResolvedVertical> {
     let stored: VerticalConfig | null = null;
     let storeDown = false;
     try {
-      stored = validStored(await store.getSetting(SETTING_KEY));
+      stored = validStored(await store.getSetting(DEFAULT_ORG, SETTING_KEY));
     } catch {
       storeDown = true;
     }
@@ -229,12 +261,12 @@ export async function resolveVertical(): Promise<ResolvedVertical> {
         // Setup only greets an EMPTY install: True North predates setup,
         // is unconfigured, and must never be ambushed by it. A store that
         // cannot be asked counts as "not empty" for the same reason.
-        setupPending: storeDown ? false : !(await store.hasAnyFlavors().catch(() => true)),
+        setupPending: storeDown ? false : !(await store.hasAnyFlavors(DEFAULT_ORG).catch(() => true)),
       };
     }
   }
 
-  box.current = { value, at: Date.now() };
+  box.set(orgId, { value, at: Date.now() });
   return value;
 }
 

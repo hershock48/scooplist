@@ -149,6 +149,35 @@ export function presetByKey(key: string): Preset | null {
   return PRESETS.find((p) => p.key === key) ?? null;
 }
 
+/**
+ * A VerticalConfig from a preset, the one construction the setup route and
+ * org creation both need (it lived inline in the setup route until org
+ * creation became its second caller; facts in one place).
+ *
+ * `categories` overrides the preset's board list wholesale: real installs
+ * keep needing boards no preset carries (Cascarelli's runs ten, Copper AC
+ * runs taps + cocktails), and an override at creation beats inventing a
+ * preset per client. Overridden categories get NO default sizes (the
+ * preset's size map is keyed to its own boards; carrying it over would
+ * price unknown boards with someone else's numbers, the placeholder rule).
+ */
+export function configFromPreset(
+  preset: Preset,
+  overrides?: { categories?: Category[]; nouns?: VerticalNouns },
+): VerticalConfig {
+  const categories =
+    overrides?.categories && overrides.categories.length > 0 ? overrides.categories : preset.categories;
+  return {
+    preset: preset.key,
+    categories,
+    allergens: preset.allergens,
+    sizes: categories === preset.categories ? preset.sizes : {},
+    example: preset.example,
+    voice: preset.voice,
+    nouns: overrides?.nouns ?? preset.nouns,
+  };
+}
+
 /** The neutral fallback nouns, for env-pinned installs that set none. */
 export const NEUTRAL_NOUNS: VerticalNouns = { item: "item", surface: "board", prep: "on" };
 export const SCOOP_NOUNS: VerticalNouns = { item: "flavor", surface: "case", prep: "in" };

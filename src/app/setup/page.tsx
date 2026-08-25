@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import SetupForm from "@/components/SetupForm";
-import { isAuthed } from "@/lib/auth";
-import { locations } from "@/lib/locations";
+import { boardHref, currentOrg, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 
@@ -15,25 +14,29 @@ export const metadata = { title: "Business type" };
  * change accordingly." A fresh install lands here before anything else
  * (the admin pages redirect while setupPending); after that it stays
  * reachable from the menu, because the choice is editable (his ruling).
+ * Orgs land here already configured (creation writes their vertical), so
+ * for them it is only ever the editing surface.
  *
  * An env-pinned deployment (the live installs) gets a plain explanation
  * instead of a form that would silently lose to the env on every save.
  */
 export default async function SetupPage() {
-  if (!(await isAuthed())) redirect("/login");
+  const org = await currentOrg();
+  if (!org) redirect("/login");
 
-  const v = await resolveVertical();
+  const v = await resolveVertical(org.slug);
   const store = getStore();
-  const hasData = await store.hasAnyFlavors().catch(() => true);
-  const shops = locations();
+  const hasData = await store.hasAnyFlavors(org.slug).catch(() => true);
+  const shops = org.locations;
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6">
       <AppHeader
         current="setup"
-        boardHref={`/board/${shops[0]?.id ?? ""}`}
+        boardHref={boardHref(org, shops[0]?.id ?? "")}
         voice={v.voice}
         nouns={v.nouns}
+        orgName={orgMode() ? org.name : undefined}
       />
 
       <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-semibold">

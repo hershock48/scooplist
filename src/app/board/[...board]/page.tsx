@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AutoRefresh from "@/components/AutoRefresh";
-import { locationById, locations } from "@/lib/locations";
 import { byCaseOrder, type CaseEntry, type Flavor } from "@/lib/domain";
+import { DEFAULT_ORG, orgBySlug, orgMode, type Org } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 
@@ -15,6 +15,17 @@ export const dynamic = "force-dynamic";
  * A plain meta refresh keeps it current, a TV stick's browser left running
  * for a week needs the dumbest possible update mechanism, not a websocket.
  *
+ * ONE CATCH-ALL ROUTE for both deployment modes, because Next.js refuses
+ * sibling dynamic segments with different names (/board/[location] beside
+ * /board/[org]/[location] is a build error, not an ambiguity):
+ *
+ *   /board/{location}        legacy single-tenant installs, the URL every
+ *                            live TV stick already has bookmarked
+ *   /board/{org}/{location}  the org-mode deployment
+ *
+ * Each mode 404s the other's depth, so a legacy install never answers for
+ * an org and the central deployment never guesses one.
+ *
  * NO SEED CALL and NO unhandled store errors, both deliberate: this route
  * is public (so a stranger's GET must not perform the first database
  * write), and it renders on a screen customers are looking at during
@@ -23,11 +34,28 @@ export const dynamic = "force-dynamic";
  * product's worst failure mode and the consumer sites already behave this
  * way (truenorth's liveCase.ts falls back rather than failing).
  */
+
+type Params = { board: string[] };
+
+async function resolveBoard(segs: string[]): Promise<{ org: Org; locationSlug: string } | null> {
+  if (segs.length === 1) {
+    if (orgMode()) return null;
+    const org = await orgBySlug(DEFAULT_ORG);
+    return org ? { org, locationSlug: segs[0] } : null;
+  }
+  if (segs.length === 2) {
+    const org = await orgBySlug(segs[0]);
+    return org ? { org, locationSlug: segs[1] } : null;
+  }
+  return null;
+}
+
 export async function generateMetadata(
-  { params }: { params: Promise<{ location: string }> },
+  { params }: { params: Promise<Params> },
 ): Promise<Metadata> {
-  const { location: slug } = await params;
-  const location = locationById(slug);
+  const { board: segs } = await params;
+  const resolved = await resolveBoard(segs);
+  const location = resolved?.org.locations.find((l) => l.id === resolved.locationSlug);
   return { title: location ? `${location.name} board` : "Board" };
 }
 
@@ -62,10 +90,13 @@ function BoardShell({ heading, children }: { heading: string; children: React.Re
 export default async function BoardPage({
   params,
 }: {
-  params: Promise<{ location: string }>;
+  params: Promise<Params>;
 }) {
-  const { location: slug } = await params;
-  const location = locationById(slug);
+  const { board: segs } = await params;
+  const resolved = await resolveBoard(segs);
+  if (!resolved) notFound();
+  const { org, locationSlug } = resolved;
+  const location = org.locations.find((l) => l.id === locationSlug);
   if (!location) notFound();
 
   /*
@@ -74,7 +105,7 @@ export default async function BoardPage({
     throws, its own store failure degrades to the scoops defaults, so it
     is safe to call before the try below.
   */
-  const vHead = await resolveVertical();
+  const vHead = await resolveVertical(org.slug);
   const heading = `${location.name}, ${vHead.nouns.prep} the ${vHead.nouns.surface}`;
 
   const store = getStore();
@@ -83,9 +114,9 @@ export default async function BoardPage({
   let updatedAt: number | null;
   try {
     [entries, flavors, updatedAt] = await Promise.all([
-      store.listCase(location.id),
-      store.listFlavors(),
-      store.caseUpdatedAt(location.id),
+      store.listCase(org.slug, location.id),
+      store.listFlavors(org.slug),
+      store.caseUpdatedAt(org.slug, location.id),
     ]);
   } catch {
     // The next tick (60s) retries; the screen never shows a stack trace.
@@ -119,7 +150,7 @@ export default async function BoardPage({
     .map((x) => ({ ...x.flavor, position: x.entry.position }))
     .sort(byCaseOrder);
 
-  const otherShops = locations().filter((l) => l.id !== location.id);
+  const otherShops = org.locations.filter((l) => l.id !== location.id);
 
   /*
     The legend is built from the CONFIGURED allergens, not a hardcoded ice

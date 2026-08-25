@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import FlipWord from "@/components/FlipWord";
 import ScooplistMark from "@/components/Logo";
-import { isAuthed } from "@/lib/auth";
+import { currentOrg, orgMode } from "@/lib/org";
 import { locations } from "@/lib/locations";
 
 /*
@@ -12,11 +12,15 @@ import { locations } from "@/lib/locations";
   own mobile hero (its .hero collapses to one centered column at 800px and
   moves .mark to order:-1, above the words). Sizes follow its lead too,
   165px on a phone, 230px up, so the two sites feel like one studio.
+
+  The org-mode deployment has no shop boards to offer here (every board
+  belongs to some org, and this page has no idea whose), so the buttons
+  reduce to the sign-in.
 */
 export default async function Home() {
-  if (await isAuthed()) redirect("/case");
+  if (await currentOrg()) redirect("/case");
 
-  const shops = locations();
+  const shops = orgMode() ? [] : locations();
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 py-14 text-center">

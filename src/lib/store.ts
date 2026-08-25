@@ -25,56 +25,82 @@ import "server-only";
  * product's future analytics ("mint chip lasted four days"), and closing beats
  * deleting for the same reason a bar logs a blown keg instead of erasing it.
  *
+ * EVERY method is org-scoped since the multi-tenant deployment mode arrived
+ * (org.ts). Single-tenant installs pass DEFAULT_ORG everywhere, and the DDL
+ * backfills org_id = 'default' onto their existing rows, so a legacy
+ * database keeps answering exactly as it always did with zero migration.
+ *
  * Types and constants live in domain.ts (client-safe, no pg import), the
  * browser UI imports THAT, never this file.
  */
 
-import type { CaseEntry, Flavor } from "@/lib/domain";
+import { DEFAULT_ORG, type CaseEntry, type Flavor } from "@/lib/domain";
+
+export type OrgRow = {
+  slug: string;
+  name: string;
+  /** Salted scrypt via auth.ts hashPin, never plaintext. */
+  pinHash: string;
+  data: { locations: { id: string; name: string }[]; createdAt: number };
+};
 
 type Store = {
   backend: "postgres" | "memory";
-  listFlavors(): Promise<Flavor[]>;
+  listFlavors(orgId: string): Promise<Flavor[]>;
   /** Cheap emptiness probe, the seed check must not haul every jsonb row. */
-  hasAnyFlavors(): Promise<boolean>;
-  getFlavor(id: string): Promise<Flavor | null>;
-  upsertFlavor(f: Flavor): Promise<void>;
+  hasAnyFlavors(orgId: string): Promise<boolean>;
+  getFlavor(orgId: string, id: string): Promise<Flavor | null>;
+  upsertFlavor(orgId: string, f: Flavor): Promise<void>;
   /** Open entries for one shop, oldest first (the order the case was built). */
-  listCase(locationId: string): Promise<CaseEntry[]>;
+  listCase(orgId: string, locationId: string): Promise<CaseEntry[]>;
   /**
    * EVERY entry, open and closed, the history nothing used to read. This is
    * the analytics ("Mint Chip lasted four days") and the export. Newest
    * first, capped generously; the cap is logged if it ever trims.
    */
-  listEntries(): Promise<CaseEntry[]>;
+  listEntries(orgId: string): Promise<CaseEntry[]>;
   /**
    * IDEMPOTENT: a flavor already open at this shop is not added twice. The
    * guard lives here (unique partial index / in-store check), not in the API
    * route, a check-then-insert in the route is a race two double-tap POSTs
    * will lose.
    */
-  addToCase(e: CaseEntry): Promise<void>;
+  addToCase(orgId: string, e: CaseEntry): Promise<void>;
   /** Close the OPEN entry for this flavor at this shop. No-op if none. */
-  closeCaseEntry(locationId: string, flavorId: string, removedAt: number): Promise<void>;
+  closeCaseEntry(orgId: string, locationId: string, flavorId: string, removedAt: number): Promise<void>;
   /** Set/clear the open entry's status: "low", "ondeck", or null = scooping. */
-  setCaseStatus(locationId: string, flavorId: string, status: "low" | "ondeck" | null): Promise<void>;
+  setCaseStatus(orgId: string, locationId: string, flavorId: string, status: "low" | "ondeck" | null): Promise<void>;
   /** Overwrite positions for a shop's open entries, in the order given. */
-  reorderCase(locationId: string, flavorIds: string[]): Promise<void>;
+  reorderCase(orgId: string, locationId: string, flavorIds: string[]): Promise<void>;
   /** When anything about a shop's case last changed, for "updated x ago". */
-  caseUpdatedAt(locationId: string): Promise<number | null>;
+  caseUpdatedAt(orgId: string, locationId: string): Promise<number | null>;
   /**
-   * Deployment settings the APP owns (the setup page's vertical choice),
-   * one jsonb value per key. Env vars stay the operator override on top;
+   * Settings the APP owns (the setup page's vertical choice), one jsonb
+   * value per key per org. Env vars stay the operator override on top;
    * vertical.ts is the only reader and owns the precedence.
    */
-  getSetting<T>(key: string): Promise<T | null>;
-  setSetting(key: string, value: unknown): Promise<void>;
+  getSetting<T>(orgId: string, key: string): Promise<T | null>;
+  setSetting(orgId: string, key: string, value: unknown): Promise<void>;
   /**
-   * Run `fn` at most once across concurrent callers, the seed guard. On
-   * postgres this takes an advisory lock so two cold serverless instances
-   * cannot both seed a fresh database; in memory a memoized promise does it.
+   * Run `fn` at most once across concurrent callers, the seed guard, scoped
+   * per org so one tenant's long seed never serializes another's. On
+   * postgres this takes an advisory lock; in memory a per-org promise chain.
    */
-  once(fn: () => Promise<void>): Promise<void>;
+  once(orgId: string, fn: () => Promise<void>): Promise<void>;
+  /** The org registry, org-mode deployments only (see org.ts). */
+  getOrg(slug: string): Promise<OrgRow | null>;
+  upsertOrg(row: OrgRow): Promise<void>;
 };
+
+/**
+ * Settings scoping by KEY PREFIX rather than a new primary key: changing a
+ * live table's PK is not an additive migration, and the legacy "vertical"
+ * row has to keep working untouched. The slug regex (org.ts) bans "/", so
+ * "org/{slug}/{key}" can never collide with a legacy key or another org's.
+ */
+function settingKey(orgId: string, key: string): string {
+  return orgId === DEFAULT_ORG ? key : `org/${orgId}/${key}`;
+}
 
 /* ------------------------------ memory ------------------------------ */
 
@@ -84,82 +110,106 @@ type Bag = {
   settings: Map<string, unknown>;
 };
 
-function bag(): Bag {
-  const g = globalThis as typeof globalThis & { __scooplist?: Bag };
+type Bags = {
+  orgs: Map<string, OrgRow>;
+  bags: Map<string, Bag>;
+};
+
+function allBags(): Bags {
+  const g = globalThis as typeof globalThis & { __scooplist?: Bags | Bag };
   if (!g.__scooplist) {
-    g.__scooplist = { flavors: new Map(), entries: new Map(), settings: new Map() };
+    g.__scooplist = { orgs: new Map(), bags: new Map() };
   }
-  // Bags created before settings existed (hot reload across versions).
-  if (!g.__scooplist.settings) g.__scooplist.settings = new Map();
-  return g.__scooplist;
+  // A bag created before orgs existed (hot reload across versions) is the
+  // legacy deployment's data: wrap it as the default org's bag.
+  const maybeOld = g.__scooplist as Bag & Partial<Bags>;
+  if (!maybeOld.bags && maybeOld.flavors) {
+    const old: Bag = {
+      flavors: maybeOld.flavors,
+      entries: maybeOld.entries,
+      settings: maybeOld.settings ?? new Map(),
+    };
+    g.__scooplist = { orgs: new Map(), bags: new Map([[DEFAULT_ORG, old]]) };
+  }
+  return g.__scooplist as Bags;
+}
+
+function bag(orgId: string): Bag {
+  const all = allBags();
+  let b = all.bags.get(orgId);
+  if (!b) {
+    b = { flavors: new Map(), entries: new Map(), settings: new Map() };
+    all.bags.set(orgId, b);
+  }
+  return b;
 }
 
 const memoryStore: Store = {
   backend: "memory",
-  async listFlavors() {
-    return [...bag().flavors.values()].sort((a, b) => a.name.localeCompare(b.name));
+  async listFlavors(orgId) {
+    return [...bag(orgId).flavors.values()].sort((a, b) => a.name.localeCompare(b.name));
   },
-  async hasAnyFlavors() {
-    return bag().flavors.size > 0;
+  async hasAnyFlavors(orgId) {
+    return bag(orgId).flavors.size > 0;
   },
-  async getFlavor(id) {
-    return bag().flavors.get(id) ?? null;
+  async getFlavor(orgId, id) {
+    return bag(orgId).flavors.get(id) ?? null;
   },
-  async upsertFlavor(f) {
-    bag().flavors.set(f.id, f);
+  async upsertFlavor(orgId, f) {
+    bag(orgId).flavors.set(f.id, f);
   },
-  async listCase(locationId) {
-    return [...bag().entries.values()]
+  async listCase(orgId, locationId) {
+    return [...bag(orgId).entries.values()]
       .filter((e) => e.locationId === locationId && e.removedAt === null)
       .sort((a, b) => a.addedAt - b.addedAt);
   },
-  async listEntries() {
-    return [...bag().entries.values()].sort((a, b) => b.addedAt - a.addedAt);
+  async listEntries(orgId) {
+    return [...bag(orgId).entries.values()].sort((a, b) => b.addedAt - a.addedAt);
   },
-  async addToCase(e) {
-    const open = [...bag().entries.values()].some(
+  async addToCase(orgId, e) {
+    const open = [...bag(orgId).entries.values()].some(
       (x) => x.locationId === e.locationId && x.flavorId === e.flavorId && x.removedAt === null,
     );
-    if (!open) bag().entries.set(e.id, e);
+    if (!open) bag(orgId).entries.set(e.id, e);
   },
-  async closeCaseEntry(locationId, flavorId, removedAt) {
-    for (const e of bag().entries.values()) {
+  async closeCaseEntry(orgId, locationId, flavorId, removedAt) {
+    for (const e of bag(orgId).entries.values()) {
       if (e.locationId === locationId && e.flavorId === flavorId && e.removedAt === null) {
         e.removedAt = removedAt;
       }
     }
   },
-  async setCaseStatus(locationId, flavorId, status) {
-    for (const e of bag().entries.values()) {
+  async setCaseStatus(orgId, locationId, flavorId, status) {
+    for (const e of bag(orgId).entries.values()) {
       if (e.locationId === locationId && e.flavorId === flavorId && e.removedAt === null) {
         e.status = status;
       }
     }
   },
-  async reorderCase(locationId, flavorIds) {
+  async reorderCase(orgId, locationId, flavorIds) {
     const order = new Map(flavorIds.map((id, i) => [id, i]));
-    for (const e of bag().entries.values()) {
+    for (const e of bag(orgId).entries.values()) {
       if (e.locationId === locationId && e.removedAt === null && order.has(e.flavorId)) {
         e.position = order.get(e.flavorId);
       }
     }
   },
-  async caseUpdatedAt(locationId) {
+  async caseUpdatedAt(orgId, locationId) {
     let t: number | null = null;
-    for (const e of bag().entries.values()) {
+    for (const e of bag(orgId).entries.values()) {
       if (e.locationId !== locationId) continue;
       const latest = Math.max(e.addedAt, e.removedAt ?? 0);
       if (t === null || latest > t) t = latest;
     }
     return t;
   },
-  async getSetting(key) {
-    return (bag().settings.get(key) as never) ?? null;
+  async getSetting(orgId, key) {
+    return (bag(orgId).settings.get(key) as never) ?? null;
   },
-  async setSetting(key, value) {
-    bag().settings.set(key, value);
+  async setSetting(orgId, key, value) {
+    bag(orgId).settings.set(key, value);
   },
-  async once(fn) {
+  async once(orgId, fn) {
     /*
       SERIALIZE, don't memoize-forever: this used to cache the first
       promise and skip every later fn, which was fine when seeding was a
@@ -167,14 +217,22 @@ const memoryStore: Store = {
       (choose tavern, then scoops: the scoops seed silently never ran,
       observed). The postgres twin is an advisory lock, i.e. mutual
       exclusion with re-entry; the "at most once" outcome comes from fn's
-      own re-check inside, on both backends.
+      own re-check inside, on both backends. One chain PER ORG, so one
+      tenant's seed never queues behind another's.
     */
-    const g = globalThis as typeof globalThis & { __scooplistOnce?: Promise<void> };
-    const run = (g.__scooplistOnce ?? Promise.resolve()).then(fn);
+    const g = globalThis as typeof globalThis & { __scooplistOnce?: Map<string, Promise<void>> };
+    if (!g.__scooplistOnce || !(g.__scooplistOnce instanceof Map)) g.__scooplistOnce = new Map();
+    const run = (g.__scooplistOnce.get(orgId) ?? Promise.resolve()).then(fn);
     // Keep the chain alive even if fn rejects, or every later once() would
     // re-reject with a stale error.
-    g.__scooplistOnce = run.catch(() => {});
+    g.__scooplistOnce.set(orgId, run.catch(() => {}));
     await run;
+  },
+  async getOrg(slug) {
+    return allBags().orgs.get(slug) ?? null;
+  },
+  async upsertOrg(row) {
+    allBags().orgs.set(row.slug, row);
   },
 };
 
@@ -242,12 +300,29 @@ async function pgPool(): Promise<PgPool> {
         removed_at bigint,
         data jsonb NOT NULL
       );
-      -- UNIQUE, deliberately: this is the "one open entry per flavor per
-      -- shop" invariant. addToCase leans on it via ON CONFLICT.
-      CREATE UNIQUE INDEX IF NOT EXISTS scooplist_case_open_uniq
-        ON scooplist_case (location_id, flavor_id) WHERE removed_at IS NULL;
       CREATE TABLE IF NOT EXISTS scooplist_settings (
         key text PRIMARY KEY,
+        data jsonb NOT NULL
+      );
+      -- The org column, added in place on live single-tenant databases:
+      -- ADD COLUMN with a DEFAULT is additive and instant (Postgres 11+
+      -- fast default, Neon qualifies), and 'default' is the sentinel every
+      -- pre-org row belongs to (DEFAULT_ORG in domain.ts). Zero migration
+      -- is the contract: the two pinned installs never run anything else.
+      ALTER TABLE scooplist_flavors ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
+      ALTER TABLE scooplist_case ADD COLUMN IF NOT EXISTS org_id text NOT NULL DEFAULT 'default';
+      -- UNIQUE, deliberately: this is the "one open entry per flavor per
+      -- shop" invariant, now per org. addToCase leans on it via ON
+      -- CONFLICT. The new index is created BEFORE the old one is dropped
+      -- so the invariant never has a gap; on a legacy database (org_id
+      -- constant 'default') the two enforce the identical rule.
+      CREATE UNIQUE INDEX IF NOT EXISTS scooplist_case_open_uniq2
+        ON scooplist_case (org_id, location_id, flavor_id) WHERE removed_at IS NULL;
+      DROP INDEX IF EXISTS scooplist_case_open_uniq;
+      CREATE TABLE IF NOT EXISTS scooplist_orgs (
+        slug text PRIMARY KEY,
+        name text NOT NULL,
+        pin_hash text NOT NULL,
         data jsonb NOT NULL
       );
     `);
@@ -258,30 +333,32 @@ async function pgPool(): Promise<PgPool> {
 
 const postgresStore: Store = {
   backend: "postgres",
-  async listFlavors() {
+  async listFlavors(orgId) {
     const pool = await pgPool();
-    const r = await pool.query(`SELECT data FROM scooplist_flavors ORDER BY name ASC`);
+    const r = await pool.query(`SELECT data FROM scooplist_flavors WHERE org_id = $1 ORDER BY name ASC`, [orgId]);
     return r.rows.map((row) => row.data as Flavor);
   },
-  async hasAnyFlavors() {
+  async hasAnyFlavors(orgId) {
     const pool = await pgPool();
-    const r = await pool.query(`SELECT 1 FROM scooplist_flavors LIMIT 1`);
+    const r = await pool.query(`SELECT 1 FROM scooplist_flavors WHERE org_id = $1 LIMIT 1`, [orgId]);
     return r.rows.length > 0;
   },
-  async getFlavor(id) {
+  async getFlavor(orgId, id) {
     const pool = await pgPool();
-    const r = await pool.query(`SELECT data FROM scooplist_flavors WHERE id = $1`, [id]);
+    // AND org_id: a guessed or pasted id from another org must miss, or the
+    // admin case route becomes a cross-tenant reference hole.
+    const r = await pool.query(`SELECT data FROM scooplist_flavors WHERE id = $1 AND org_id = $2`, [id, orgId]);
     return (r.rows[0]?.data as Flavor) ?? null;
   },
-  async upsertFlavor(f) {
+  async upsertFlavor(orgId, f) {
     const pool = await pgPool();
     await pool.query(
-      `INSERT INTO scooplist_flavors (id, name, data) VALUES ($1, $2, $3)
-       ON CONFLICT (id) DO UPDATE SET name = $2, data = $3`,
-      [f.id, f.name, JSON.stringify(f)],
+      `INSERT INTO scooplist_flavors (id, name, data, org_id) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (id) DO UPDATE SET name = $2, data = $3 WHERE scooplist_flavors.org_id = $4`,
+      [f.id, f.name, JSON.stringify(f), orgId],
     );
   },
-  async listCase(locationId) {
+  async listCase(orgId, locationId) {
     const pool = await pgPool();
     /*
       Fetch one PAST the cap so truncation is detectable. No real case has
@@ -291,9 +368,9 @@ const postgresStore: Store = {
     */
     const r = await pool.query(
       `SELECT data FROM scooplist_case
-       WHERE location_id = $1 AND removed_at IS NULL
+       WHERE org_id = $1 AND location_id = $2 AND removed_at IS NULL
        ORDER BY added_at ASC LIMIT 501`,
-      [locationId],
+      [orgId, locationId],
     );
     if (r.rows.length > 500) {
       console.warn(`scooplist: case for ${locationId} exceeds 500 open entries, list truncated`);
@@ -301,10 +378,11 @@ const postgresStore: Store = {
     }
     return r.rows.map((row) => row.data as CaseEntry);
   },
-  async listEntries() {
+  async listEntries(orgId) {
     const pool = await pgPool();
     const r = await pool.query(
-      `SELECT data FROM scooplist_case ORDER BY added_at DESC LIMIT 20001`,
+      `SELECT data FROM scooplist_case WHERE org_id = $1 ORDER BY added_at DESC LIMIT 20001`,
+      [orgId],
     );
     if (r.rows.length > 20000) {
       console.warn("scooplist: history exceeds 20000 entries, list truncated");
@@ -312,81 +390,107 @@ const postgresStore: Store = {
     }
     return r.rows.map((row) => row.data as CaseEntry);
   },
-  async addToCase(e) {
+  async addToCase(orgId, e) {
     const pool = await pgPool();
     await pool.query(
-      `INSERT INTO scooplist_case (id, location_id, flavor_id, added_at, removed_at, data)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (location_id, flavor_id) WHERE removed_at IS NULL DO NOTHING`,
-      [e.id, e.locationId, e.flavorId, e.addedAt, e.removedAt, JSON.stringify(e)],
+      `INSERT INTO scooplist_case (id, location_id, flavor_id, added_at, removed_at, data, org_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (org_id, location_id, flavor_id) WHERE removed_at IS NULL DO NOTHING`,
+      [e.id, e.locationId, e.flavorId, e.addedAt, e.removedAt, JSON.stringify(e), orgId],
     );
   },
-  async closeCaseEntry(locationId, flavorId, removedAt) {
+  async closeCaseEntry(orgId, locationId, flavorId, removedAt) {
     const pool = await pgPool();
     await pool.query(
       `UPDATE scooplist_case
        SET removed_at = $3, data = data || jsonb_build_object('removedAt', $3::bigint)
-       WHERE location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
-      [locationId, flavorId, removedAt],
+       WHERE org_id = $4 AND location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
+      [locationId, flavorId, removedAt, orgId],
     );
   },
-  async setCaseStatus(locationId, flavorId, status) {
+  async setCaseStatus(orgId, locationId, flavorId, status) {
     const pool = await pgPool();
     // null clears the key entirely so the blob stays as small as it started.
     await pool.query(
       status === null
         ? `UPDATE scooplist_case SET data = data - 'status'
-           WHERE location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`
+           WHERE org_id = $3 AND location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`
         : `UPDATE scooplist_case SET data = data || jsonb_build_object('status', $3::text)
-           WHERE location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
-      status === null ? [locationId, flavorId] : [locationId, flavorId, status],
+           WHERE org_id = $4 AND location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
+      status === null ? [locationId, flavorId, orgId] : [locationId, flavorId, status, orgId],
     );
   },
-  async reorderCase(locationId, flavorIds) {
+  async reorderCase(orgId, locationId, flavorIds) {
     const pool = await pgPool();
     // A handful of rows at most; one statement per row is simpler than a
     // jsonb VALUES join and impossible to get subtly wrong.
     for (let i = 0; i < flavorIds.length; i++) {
       await pool.query(
         `UPDATE scooplist_case SET data = data || jsonb_build_object('position', $3::int)
-         WHERE location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
-        [locationId, flavorIds[i], i],
+         WHERE org_id = $4 AND location_id = $1 AND flavor_id = $2 AND removed_at IS NULL`,
+        [locationId, flavorIds[i], i, orgId],
       );
     }
   },
-  async caseUpdatedAt(locationId) {
+  async caseUpdatedAt(orgId, locationId) {
     const pool = await pgPool();
     const r = await pool.query(
-      `SELECT GREATEST(MAX(added_at), MAX(removed_at)) AS t FROM scooplist_case WHERE location_id = $1`,
-      [locationId],
+      `SELECT GREATEST(MAX(added_at), MAX(removed_at)) AS t FROM scooplist_case
+       WHERE org_id = $1 AND location_id = $2`,
+      [orgId, locationId],
     );
     const t = r.rows[0]?.t;
     return t == null ? null : Number(t);
   },
-  async getSetting(key) {
+  async getSetting(orgId, key) {
     const pool = await pgPool();
-    const r = await pool.query(`SELECT data FROM scooplist_settings WHERE key = $1`, [key]);
+    const r = await pool.query(`SELECT data FROM scooplist_settings WHERE key = $1`, [settingKey(orgId, key)]);
     return (r.rows[0]?.data as never) ?? null;
   },
-  async setSetting(key, value) {
+  async setSetting(orgId, key, value) {
     const pool = await pgPool();
     await pool.query(
       `INSERT INTO scooplist_settings (key, data) VALUES ($1, $2)
        ON CONFLICT (key) DO UPDATE SET data = $2`,
-      [key, JSON.stringify(value)],
+      [settingKey(orgId, key), JSON.stringify(value)],
     );
   },
-  async once(fn) {
+  async once(orgId, fn) {
     // Advisory lock: two cold serverless instances hitting a fresh database
     // serialize here, and the second one re-checks inside fn (seedIfEmpty
-    // re-probes) so it becomes a no-op instead of a double seed.
+    // re-probes) so it becomes a no-op instead of a double seed. Two-int
+    // form: 823542 stays the app's namespace (so no collision with other
+    // apps' locks on a shared database), hashtext discriminates per org so
+    // tenants never serialize behind each other.
     const pool = await pgPool();
-    await pool.query(`SELECT pg_advisory_lock(823542)`);
+    await pool.query(`SELECT pg_advisory_lock(823542, hashtext($1))`, [orgId]);
     try {
       await fn();
     } finally {
-      await pool.query(`SELECT pg_advisory_unlock(823542)`);
+      await pool.query(`SELECT pg_advisory_unlock(823542, hashtext($1))`, [orgId]);
     }
+  },
+  async getOrg(slug) {
+    const pool = await pgPool();
+    const r = await pool.query(`SELECT slug, name, pin_hash, data FROM scooplist_orgs WHERE slug = $1`, [slug]);
+    const row = r.rows[0];
+    if (!row) return null;
+    return {
+      slug: String(row.slug),
+      name: String(row.name),
+      pinHash: String(row.pin_hash),
+      data: row.data as OrgRow["data"],
+    };
+  },
+  async upsertOrg(row) {
+    const pool = await pgPool();
+    // Upsert on purpose: re-running creation is how a PIN gets rotated or a
+    // location list gets edited, with no separate update surface to build.
+    await pool.query(
+      `INSERT INTO scooplist_orgs (slug, name, pin_hash, data) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (slug) DO UPDATE SET name = $2, pin_hash = $3, data = $4`,
+      [row.slug, row.name, row.pinHash, JSON.stringify(row.data)],
+    );
   },
 };
 

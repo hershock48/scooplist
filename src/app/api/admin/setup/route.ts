@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { isAuthed } from "@/lib/auth";
-import { presetByKey, type VerticalConfig } from "@/lib/presets";
+import { currentOrg } from "@/lib/org";
+import { configFromPreset, presetByKey } from "@/lib/presets";
 import { invalidateVertical } from "@/lib/vertical";
 import { resetSeedGuard, seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
@@ -21,10 +21,12 @@ const cleanNoun = (v: unknown, max: number) =>
  * Saves the business-type choice from /setup, then seeds the matching demo
  * data if the library is empty. Env-pinned deployments are refused rather
  * than silently overruled: a save that the next page load ignores would
- * teach the owner the screen is broken.
+ * teach the owner the screen is broken. (The env pin cannot exist in org
+ * mode, org.ts's mode rule, so the 409 only ever fires on legacy installs.)
  */
 export async function POST(request: Request) {
-  if (!(await isAuthed())) {
+  const org = await currentOrg();
+  if (!org) {
     return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   }
   if (process.env.SCOOPLIST_CATEGORIES) {
@@ -46,15 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Pick a business type." }, { status: 400 });
   }
 
-  const config: VerticalConfig = {
-    preset: preset.key,
-    categories: preset.categories,
-    allergens: preset.allergens,
-    sizes: preset.sizes,
-    example: preset.example,
-    voice: preset.voice,
-    nouns: preset.nouns,
-  };
+  const config = configFromPreset(preset);
 
   if (preset.key === "other" && b.other) {
     const item = cleanNoun(b.other.item, 24);
@@ -71,14 +65,14 @@ export async function POST(request: Request) {
   }
 
   const store = getStore();
-  await store.setSetting("vertical", config);
-  invalidateVertical();
-  resetSeedGuard();
+  await store.setSetting(org.slug, "vertical", config);
+  invalidateVertical(org.slug);
+  resetSeedGuard(org.slug);
 
   // A fresh library gets the preset's demo data (seedIfEmpty resolves the
   // config we just saved and no-ops for presets that start empty, or when
   // real data already exists).
-  await seedIfEmpty().catch((err) => {
+  await seedIfEmpty(org.slug).catch((err) => {
     console.error("scooplist: post-setup seed failed:", err);
   });
 

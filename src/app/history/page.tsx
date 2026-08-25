@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { isAuthed } from "@/lib/auth";
-import { locations } from "@/lib/locations";
+import { boardHref, currentOrg, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
 import type { CaseEntry, Flavor } from "@/lib/domain";
 import { getStore } from "@/lib/store";
@@ -79,24 +78,29 @@ function since(t: number, now: number): string {
 }
 
 export default async function HistoryPage() {
-  if (!(await isAuthed())) redirect("/login");
+  const org = await currentOrg();
+  if (!org) redirect("/login");
 
-  const v = await resolveVertical();
+  const v = await resolveVertical(org.slug);
   if (v.setupPending) redirect("/setup");
 
   const store = getStore();
   const now = Date.now();
-  const shops = locations();
-  const [flavors, entries] = await Promise.all([store.listFlavors(), store.listEntries()]);
+  const shops = org.locations;
+  const [flavors, entries] = await Promise.all([
+    store.listFlavors(org.slug),
+    store.listEntries(org.slug),
+  ]);
   const byId = new Map(flavors.map((f) => [f.id, f]));
 
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16 pt-6">
       <AppHeader
         current="history"
-        boardHref={`/board/${shops[0]?.id ?? ""}`}
+        boardHref={boardHref(org, shops[0]?.id ?? "")}
         voice={v.voice}
         nouns={v.nouns}
+        orgName={orgMode() ? org.name : undefined}
       />
 
       <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-semibold">
