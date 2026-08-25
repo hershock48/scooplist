@@ -136,7 +136,7 @@ The URL map, per org:
 Creating an org (upsert, so a re-run rotates a PIN or edits locations):
 
     $env:SCOOPLIST_MASTER = "<the master secret>"
-    node tools/create-org.mjs --url https://scooplist.glazedweb.com `
+    node tools/create-org.mjs --url https://scooplist-orgs.vercel.app `
       --slug copperac --name "Copper Athletic Club" --pin <pin> `
       --preset tavern --categories "taps:On Tap,cocktails:Cocktails" `
       --locations "marshall:Copper Athletic Club"

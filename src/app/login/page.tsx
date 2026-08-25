@@ -58,7 +58,8 @@ export default async function LoginPage({
         </button>
       </form>
       <p className="mt-6 text-sm text-ink-soft">
-        Most shops sign in from their own link, scooplist.glazedweb.com/login/yourshop.
+        Most shops sign in from the link they were given, which ends in
+        /login/yourshop.
       </p>
     </main>
   );
