@@ -92,6 +92,7 @@ export async function GET() {
         SCOOPLIST_PIN: Boolean(process.env.SCOOPLIST_PIN),
         SCOOPLIST_SECRET: Boolean(process.env.SCOOPLIST_SECRET),
         SCOOPLIST_MASTER: Boolean(process.env.SCOOPLIST_MASTER),
+        SCOOPLIST_LEGACY_ALIAS: Boolean(process.env.SCOOPLIST_LEGACY_ALIAS),
         otherBlobKeys: Object.keys(process.env).filter(
           (k) => k.includes("BLOB") && k !== "BLOB_READ_WRITE_TOKEN" && k !== "BLOB_STORE_ID",
         ).length,

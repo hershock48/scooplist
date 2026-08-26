@@ -74,6 +74,22 @@ export function validOrgSlug(s: string): boolean {
   return SLUG_RE.test(s) && !RESERVED_SLUGS.has(s);
 }
 
+/**
+ * SCOOPLIST_LEGACY_ALIAS keeps a flipped install's OLD public URLs alive:
+ * when a single-tenant deployment becomes the org deployment (True North's
+ * install became the central one, August 2026), its bookmarked TV boards
+ * (/board/marshall) and its site's feed URL (/api/v1/case/marshall) must
+ * not break mid-flip. Set to an org slug, the legacy public routes serve
+ * that org; the admin surfaces are NOT aliased, owners sign in at
+ * /login/{org} like everyone else. Public-only on purpose: the alias
+ * exists for URLs already printed on someone's hardware, not as a second
+ * front door.
+ */
+export function legacyAliasSlug(): string | null {
+  const raw = process.env.SCOOPLIST_LEGACY_ALIAS?.trim().toLowerCase();
+  return raw && validOrgSlug(raw) ? raw : null;
+}
+
 /** The public TV board URL for one of an org's shops, both modes' shapes
     in one place so the four admin pages cannot disagree about it. */
 export function boardHref(org: Org, shopId: string): string {

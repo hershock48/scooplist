@@ -121,10 +121,16 @@ authority on the real configuration.
 The central deployment serves many organizations from one database. The
 mode rule lives in `src/lib/org.ts` and is opt-in: `SCOOPLIST_MASTER` set,
 `SCOOPLIST_LOCATIONS` and `SCOOPLIST_CATEGORIES` both unset. Legacy is the
-default, so deploying this code to the two live single-tenant installs
-changes nothing there (their databases self-migrate additively: an org_id
-column defaulting to 'default', a widened unique index, an orgs table
-nothing reads).
+default, so deploying this code to a single-tenant install changes nothing
+there (its database self-migrates additively: an org_id column defaulting
+to 'default', a widened unique index, an orgs table nothing reads).
+
+The central deployment IS the `scooplist` Vercel project at
+scooplist.glazedweb.com, which was True North's single-tenant install:
+Kevin's call, August 2026, that the product's domain should belong to the
+product and True North should be its first org rather than a special case
+squatting on it. The flip mechanism is below; Cascarelli's stays
+single-tenant on its own project until there is a reason to move it.
 
 The URL map, per org:
 
@@ -136,10 +142,36 @@ The URL map, per org:
 Creating an org (upsert, so a re-run rotates a PIN or edits locations):
 
     $env:SCOOPLIST_MASTER = "<the master secret>"
-    node tools/create-org.mjs --url https://scooplist-orgs.vercel.app `
+    node tools/create-org.mjs --url https://scooplist.glazedweb.com `
       --slug copperac --name "Copper Athletic Club" --pin <pin> `
       --preset tavern --categories "taps:On Tap,cocktails:Cocktails" `
       --locations "marshall:Copper Athletic Club"
+
+### Flipping a single-tenant install into the org deployment
+
+The data never leaves the database; it is re-labeled in place, history
+included. In order, and quickly, because between steps 1 and 2 the old
+public URLs serve fallbacks:
+
+1. Vercel dashboard, on the install's project: set `SCOOPLIST_MASTER`
+   (long and random) and `SCOOPLIST_LEGACY_ALIAS=<slug>` (the org the old
+   URLs should keep serving). `SCOOPLIST_SECRET` should already be set.
+   Redeploy.
+2. `node tools/create-org.mjs --url <the deployment> --slug <slug> --name
+   "<Name>" --pin <new pin> --preset <preset> --locations "..."
+   --adopt-legacy` with the master secret in the terminal. Adoption
+   replaces seeding: the org inherits the whole library, case, and
+   history.
+3. Verify: the OLD feed URL (`/api/v1/case/{location}`) and the old
+   `/board/{location}` answer identically to before; the org URLs answer
+   the same data; `/api/status` shows `mode: "orgs"`.
+4. Tell the owner their PIN changed and their sign-in link is now
+   `/login/{slug}` (the legacy cookie died with the flip; the TV boards
+   and the site never noticed anything).
+
+Consumer sites on the legacy feed path keep working through the alias
+indefinitely; moving them to `/api/v1/orgs/{slug}/case/{location}` is a
+one-line cleanup whenever their repo is next open.
 
 `--categories` overrides the preset's boards; without it the preset's own
 list applies and seeding presets (scoops, or the full Cascarelli's-shaped

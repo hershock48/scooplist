@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AutoRefresh from "@/components/AutoRefresh";
 import { byCaseOrder, type CaseEntry, type Flavor } from "@/lib/domain";
-import { DEFAULT_ORG, orgBySlug, orgMode, type Org } from "@/lib/org";
+import { DEFAULT_ORG, legacyAliasSlug, orgBySlug, orgMode, type Org } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
 
@@ -39,7 +39,14 @@ type Params = { board: string[] };
 
 async function resolveBoard(segs: string[]): Promise<{ org: Org; locationSlug: string } | null> {
   if (segs.length === 1) {
-    if (orgMode()) return null;
+    if (orgMode()) {
+      // The alias keeps a flipped install's bookmarked TV URLs alive
+      // (org.ts explains); without one, single-segment boards do not
+      // exist here.
+      const alias = legacyAliasSlug();
+      const org = alias ? await orgBySlug(alias) : null;
+      return org ? { org, locationSlug: segs[0] } : null;
+    }
     const org = await orgBySlug(DEFAULT_ORG);
     return org ? { org, locationSlug: segs[0] } : null;
   }

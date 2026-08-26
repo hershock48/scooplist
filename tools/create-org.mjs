@@ -20,6 +20,12 @@
  * preset's generic taps/cans/na rarely matches a real bar's program).
  * --locations and --categories both use the env-var pair format,
  * "slug:Label,slug2:Label2", so there is one syntax to remember.
+ *
+ * --adopt-legacy is the flip: instead of seeding, the new org inherits
+ * every pre-org row on the deployment (library, case, full history).
+ * For turning a single-tenant install into the org deployment (True
+ * North, August 2026). Pair it with SCOOPLIST_LEGACY_ALIAS=<slug> on the
+ * deployment so the old public URLs keep serving the adopted org.
  */
 
 function arg(name) {
@@ -54,12 +60,13 @@ const pin = arg("pin");
 const preset = arg("preset");
 const locationsRaw = arg("locations");
 const categoriesRaw = arg("categories");
+const adoptLegacy = process.argv.includes("--adopt-legacy");
 
 if (!url || !slug || !name || !pin || !preset || !locationsRaw) {
   console.error(
     "Usage: node tools/create-org.mjs --url <deployment> --slug <org> " +
       '--name "<Org Name>" --pin <pin> --preset scoops|tavern|coffee|other ' +
-      '--locations "slug:Name,..." [--categories "key:Label,..."]',
+      '--locations "slug:Name,..." [--categories "key:Label,..."] [--adopt-legacy]',
   );
   process.exit(1);
 }
@@ -72,6 +79,7 @@ const body = {
   preset,
   locations: pairs(locationsRaw).map((p) => ({ id: p.key, name: p.label })),
   ...(categoriesRaw ? { categories: pairs(categoriesRaw).map((p) => ({ key: p.key, label: p.label })) } : {}),
+  ...(adoptLegacy ? { adoptLegacy: true } : {}),
 };
 
 const res = await fetch(`${base}/api/master/org`, {
@@ -90,6 +98,10 @@ if (!res.ok || !out.ok) {
 }
 
 console.log(`Org "${out.slug}" is ready on ${base}.`);
+if (adoptLegacy) {
+  console.log("  Adopted the deployment's pre-org data (library, case, history).");
+  console.log(`  Check the old URLs still answer if SCOOPLIST_LEGACY_ALIAS=${out.slug} is set.`);
+}
 console.log(`  Sign-in link (hand this to the owner): ${base}${out.urls.login}`);
 for (const b of out.urls.boards) console.log(`  TV board: ${base}${b}`);
 for (const f of out.urls.feeds) console.log(`  Feed: ${base}${f}`);

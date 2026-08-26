@@ -90,6 +90,15 @@ type Store = {
   /** The org registry, org-mode deployments only (see org.ts). */
   getOrg(slug: string): Promise<OrgRow | null>;
   upsertOrg(row: OrgRow): Promise<void>;
+  /**
+   * Re-label every pre-org row (org_id 'default') as `orgId`: the flip
+   * that turns a single-tenant install's data into that org, in place,
+   * history included, nothing copied between databases. Idempotent: a
+   * re-run finds nothing left to move. Sequential statements rather than
+   * a transaction (the pool API hides connections, and a partial run
+   * completes on re-run, which the master route's caller documents).
+   */
+  adoptDefaultOrg(orgId: string): Promise<void>;
 };
 
 /**
@@ -233,6 +242,17 @@ const memoryStore: Store = {
   },
   async upsertOrg(row) {
     allBags().orgs.set(row.slug, row);
+  },
+  async adoptDefaultOrg(orgId) {
+    const from = bag(DEFAULT_ORG);
+    const to = bag(orgId);
+    for (const [k, v] of from.flavors) to.flavors.set(k, v);
+    for (const [k, v] of from.entries) to.entries.set(k, v);
+    // The org's own settings win: creation just wrote them on purpose.
+    for (const [k, v] of from.settings) if (!to.settings.has(k)) to.settings.set(k, v);
+    from.flavors.clear();
+    from.entries.clear();
+    from.settings.clear();
   },
 };
 
@@ -490,6 +510,22 @@ const postgresStore: Store = {
       `INSERT INTO scooplist_orgs (slug, name, pin_hash, data) VALUES ($1, $2, $3, $4)
        ON CONFLICT (slug) DO UPDATE SET name = $2, pin_hash = $3, data = $4`,
       [row.slug, row.name, row.pinHash, JSON.stringify(row.data)],
+    );
+  },
+  async adoptDefaultOrg(orgId) {
+    const pool = await pgPool();
+    await pool.query(`UPDATE scooplist_flavors SET org_id = $1 WHERE org_id = 'default'`, [orgId]);
+    await pool.query(`UPDATE scooplist_case SET org_id = $1 WHERE org_id = 'default'`, [orgId]);
+    // Legacy settings take the org prefix; a key the org already owns
+    // stays put (creation just wrote it on purpose, it wins).
+    await pool.query(
+      `UPDATE scooplist_settings SET key = 'org/' || $1 || '/' || key
+       WHERE key NOT LIKE 'org/%'
+         AND NOT EXISTS (
+           SELECT 1 FROM scooplist_settings s2
+           WHERE s2.key = 'org/' || $1 || '/' || scooplist_settings.key
+         )`,
+      [orgId],
     );
   },
 };

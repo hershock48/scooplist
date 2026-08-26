@@ -30,6 +30,14 @@ type Body = {
   categories?: { key?: string; label?: string }[];
   nouns?: { item?: string; surface?: string; prep?: string };
   firstBoard?: string;
+  /**
+   * The flip: this org inherits every pre-org row on the deployment
+   * (flavors, case, the whole history) instead of seeding. For turning a
+   * single-tenant install into the org deployment without its data ever
+   * leaving the database. Idempotent, and a partially applied run
+   * completes on re-run (the store moves rows in place).
+   */
+  adoptLegacy?: boolean;
 };
 
 const clean = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -130,11 +138,19 @@ export async function POST(request: Request) {
   await store.setSetting(slug, "vertical", config);
   invalidateVertical(slug);
   resetSeedGuard(slug);
-  // Presets that seed fill an empty library now; a re-run against a
-  // non-empty one is a no-op (seedIfEmpty's own guards).
-  await seedIfEmpty(slug).catch((err) => {
-    console.error("scooplist: org creation seed failed:", err);
-  });
+  if (b.adoptLegacy === true) {
+    // Adoption replaces seeding entirely: the org's library IS the
+    // legacy library, and demo rows on top of a real one would be the
+    // exact pollution the seed guards exist to prevent.
+    await store.adoptDefaultOrg(slug);
+    invalidateVertical(slug);
+  } else {
+    // Presets that seed fill an empty library now; a re-run against a
+    // non-empty one is a no-op (seedIfEmpty's own guards).
+    await seedIfEmpty(slug).catch((err) => {
+      console.error("scooplist: org creation seed failed:", err);
+    });
+  }
 
   // Never the pin, never the hash: the response is a receipt, not a secret.
   return NextResponse.json({
