@@ -12,7 +12,7 @@ import {
   type Flavor,
   type Size,
 } from "@/lib/domain";
-import type { Category, VerticalNouns } from "@/lib/presets";
+import { surfaceTitle, type Category, type VerticalNouns } from "@/lib/presets";
 import type { ShopLocation } from "@/lib/locations";
 
 /**
@@ -226,7 +226,9 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
         </div>
         <p className="mt-2 text-xs text-ink-soft">
           {voice === "neutral"
-            ? `It lands in the library only. Put it ${nouns.prep} the ${nouns.surface} from The ${nouns.surface} screen when it goes on.`
+            ? nouns.live
+              ? `It lands in the library only. Mark it ${nouns.live} from the ${surfaceTitle(nouns)} screen when it goes on.`
+              : `It lands in the library only. Put it ${nouns.prep} the ${nouns.surface} from The ${nouns.surface} screen when it goes on.`
             : "It lands in the library only, put it in a case from The Case screen when it’s churned."}
         </p>
       </div>
@@ -296,7 +298,7 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
                       {/* Where it is RIGHT NOW, the thing the old flat list never said. */}
                       <span className="block text-xs text-ink-soft">
                         {out.length > 0
-                          ? `${voice === "neutral" ? `${nouns.prep === "in" ? "In" : "On"} the ${nouns.surface}` : "In the case"}: ${out
+                          ? `${voice === "neutral" ? (nouns.live ? surfaceTitle(nouns) : `${nouns.prep === "in" ? "In" : "On"} the ${nouns.surface}`) : "In the case"}: ${out
                               .map((id) => shops.find((s) => s.id === id)?.name ?? id)
                               .join(", ")}`
                           : f.retired

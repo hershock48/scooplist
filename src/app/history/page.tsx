@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { boardHref, currentOrg, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
+import { presetByKey } from "@/lib/presets";
 import type { CaseEntry, Flavor } from "@/lib/domain";
 import { getStore } from "@/lib/store";
 
@@ -83,6 +84,9 @@ export default async function HistoryPage() {
 
   const v = await resolveVertical(org.slug);
   if (v.setupPending) redirect("/setup");
+  // Hidden means hidden: a trade whose preset turns History off (bars) is
+  // sent to its board rather than finding the screen by URL.
+  if (presetByKey(v.preset)?.history === false) redirect("/case");
 
   const store = getStore();
   const now = Date.now();
@@ -100,6 +104,8 @@ export default async function HistoryPage() {
         boardHref={boardHref(org, shops[0]?.id ?? "")}
         voice={v.voice}
         nouns={v.nouns}
+        preset={v.preset}
+        managed={orgMode()}
         orgName={orgMode() ? org.name : undefined}
       />
 

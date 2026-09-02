@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import ScooplistMark from "@/components/Logo";
-import type { VerticalNouns } from "@/lib/presets";
+import { presetByKey, surfaceTitle, type PresetKey, type VerticalNouns } from "@/lib/presets";
 
 /**
  * The signed-in header.
@@ -25,6 +25,8 @@ export default function AppHeader({
   boardHref,
   voice = "scoops",
   nouns,
+  preset,
+  managed = false,
   orgName,
 }: {
   current: "case" | "library" | "history" | "setup";
@@ -33,6 +35,14 @@ export default function AppHeader({
   voice?: "scoops" | "neutral";
   /** The vertical's own words (presets.ts): case, cooler, board. */
   nouns?: VerticalNouns;
+  /** Which preset the business is on; decides whether History is offered. */
+  preset?: PresetKey;
+  /**
+   * True on the shared deployment, where the business type is set by us at
+   * creation and the owner cannot change it (Kevin's ruling, 2 Sep 2026),
+   * so the header does not offer the screen.
+   */
+  managed?: boolean;
   /**
    * The signed-in org's name, org-mode deployments only. One browser holds
    * one session, so whoever manages two shops switches by signing in
@@ -58,12 +68,17 @@ export default function AppHeader({
     };
   }, [open]);
 
-  const surface = nouns?.surface ?? (voice === "neutral" ? "board" : "case");
+  const caseLabel = nouns
+    ? surfaceTitle(nouns)
+    : voice === "neutral"
+      ? "The board"
+      : "The case";
+  const showHistory = preset ? presetByKey(preset)?.history !== false : true;
   const items: Item[] = [
-    { href: "/case", label: `The ${surface}` },
+    { href: "/case", label: caseLabel },
     { href: "/flavors", label: "Library" },
-    { href: "/history", label: "History" },
-    { href: "/setup", label: "Business type" },
+    ...(showHistory ? [{ href: "/history", label: "History" }] : []),
+    ...(managed ? [] : [{ href: "/setup", label: "Business type" }]),
     { href: boardHref, label: "TV board ↗", external: true },
   ];
 

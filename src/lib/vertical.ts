@@ -164,8 +164,9 @@ function validStored(v: unknown): VerticalConfig | null {
   const c = v as Partial<VerticalConfig>;
   if (!Array.isArray(c.categories) || c.categories.length === 0) return null;
   if (!c.nouns?.item || !c.nouns?.surface) return null;
+  const preset = (presetByKey(String(c.preset)) ? c.preset : "other") as PresetKey;
   return {
-    preset: (presetByKey(String(c.preset)) ? c.preset : "other") as PresetKey,
+    preset,
     categories: c.categories.filter((x) => x?.key).map((x) => ({ key: String(x.key), label: String(x.label ?? x.key) })),
     allergens: Array.isArray(c.allergens) ? c.allergens.map(String) : [],
     sizes: c.sizes && typeof c.sizes === "object" ? (c.sizes as Record<string, Size[]>) : {},
@@ -175,6 +176,10 @@ function validStored(v: unknown): VerticalConfig | null {
       item: String(c.nouns.item),
       surface: String(c.nouns.surface),
       prep: c.nouns.prep === "in" ? "in" : "on",
+      // From the preset in code, never the stored row: the row was copied
+      // at creation and would pin yesterday's sentences on every business
+      // that already exists. "Other" has no preset voice to take it from.
+      live: presetByKey(preset)?.nouns.live,
     },
   };
 }

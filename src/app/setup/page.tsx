@@ -3,6 +3,7 @@ import AppHeader from "@/components/AppHeader";
 import SetupForm from "@/components/SetupForm";
 import { boardHref, currentOrg, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
+import { presetByKey } from "@/lib/presets";
 import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +14,17 @@ export const metadata = { title: "Business type" };
  * where we select what sort of business this is and these little things
  * change accordingly." A fresh install lands here before anything else
  * (the admin pages redirect while setupPending); after that it stays
- * reachable from the menu, because the choice is editable (his ruling).
- * Orgs land here already configured (creation writes their vertical), so
- * for them it is only ever the editing surface.
+ * reachable from the menu on a single-tenant install, because there the
+ * choice is the owner's (his ruling).
  *
- * An env-pinned deployment (the live installs) gets a plain explanation
- * instead of a form that would silently lose to the env on every save.
+ * On the shared deployment it is NOT the owner's: the type is set by us at
+ * creation (create-org, with the master secret) and an owner cannot change
+ * it (Kevin's ruling, 2 Sep 2026). The header no longer links here for
+ * them, the page shows a note instead of the form, and the API behind the
+ * form refuses in org mode, so the lock is real and not just a hidden link.
+ *
+ * An env-pinned deployment (the live installs) gets the same plain
+ * explanation instead of a form that would silently lose to the env.
  */
 export default async function SetupPage() {
   const org = await currentOrg();
@@ -36,6 +42,8 @@ export default async function SetupPage() {
         boardHref={boardHref(org, shops[0]?.id ?? "")}
         voice={v.voice}
         nouns={v.nouns}
+        preset={v.preset}
+        managed={orgMode()}
         orgName={orgMode() ? org.name : undefined}
       />
 
@@ -44,18 +52,19 @@ export default async function SetupPage() {
       </h1>
       <p className="mt-2 text-ink-soft">
         The boards, the starting prices, the allergen chips, and the words
-        the app uses all follow from this. You can change it here any time.
+        the app uses all follow from this.
+        {v.source === "env" || orgMode() ? "" : " You can change it here any time."}
       </p>
 
-      {v.source === "env" ? (
+      {v.source === "env" || orgMode() ? (
         <div className="card mt-6 px-5 py-5">
           <p className="font-semibold">
-            This deployment is configured by your web person.
+            Set up by Glazed Web: {presetByKey(v.preset)?.label ?? v.preset}.
           </p>
           <p className="mt-1 text-sm text-ink-soft">
-            The business type here is set at the hosting level, so this
-            screen is read-only. If something reads wrong, tell Glazed Web
-            and it&apos;s a one-line change on their side.
+            The business type is part of how your account was created, so
+            this screen is read-only. If something reads wrong, tell Glazed
+            Web and it&apos;s a one-line change on their side.
           </p>
         </div>
       ) : (

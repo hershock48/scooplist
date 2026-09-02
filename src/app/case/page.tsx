@@ -4,6 +4,7 @@ import CaseBoard from "@/components/CaseBoard";
 import AppHeader from "@/components/AppHeader";
 import { boardHref, currentOrg, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
+import { surfaceTitle } from "@/lib/presets";
 import { seedIfEmpty } from "@/lib/seed";
 import { getStore } from "@/lib/store";
 import type { CaseStatus } from "@/lib/domain";
@@ -14,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const org = await currentOrg();
   if (!org) return { title: "The case" };
   const v = await resolveVertical(org.slug);
-  return { title: `The ${v.nouns.surface}` };
+  return { title: surfaceTitle(v.nouns) };
 }
 
 export default async function CasePage() {
@@ -55,6 +56,8 @@ export default async function CasePage() {
         boardHref={boardHref(org, shops[0]?.id ?? "")}
         voice={v.voice}
         nouns={v.nouns}
+        preset={v.preset}
+        managed={orgMode()}
         orgName={orgMode() ? org.name : undefined}
       />
 

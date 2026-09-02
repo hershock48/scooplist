@@ -90,6 +90,27 @@ const SCOOP_COPY: Copy = {
 };
 
 function neutralCopy(n: VerticalNouns): Copy {
+  // A trade with a live word ("pouring") talks about the state, not the
+  // furniture: "Pouring at Copper Athletic Club", "86 it, it's done
+  // pouring". The surface noun stays for trades without one.
+  if (n.live) {
+    const live = n.live;
+    const Live = live[0].toUpperCase() + live.slice(1);
+    return {
+      noun: n.item,
+      out: `86 it, it's done ${live}`,
+      start: `Back on, ${live} again`,
+      ondeck: "On deck, it goes on next",
+      addIt: `Add it, it's ${live}`,
+      inCase: (shop) => `${Live} at ${shop}.`,
+      low: (shop) => `Running low at ${shop}, last call.`,
+      newInto: (shop) => `New ${n.item}, ${live} at ${shop}`,
+      empty: (shop) => `Nothing ${live} at ${shop} yet.`,
+      count: (count) => `${count} ${live}`,
+      offBoard: (shop) => `is done ${live} at ${shop}.`,
+      confirmTitle: (name, shop) => `86 ${name} at ${shop}?`,
+    };
+  }
   const outOf = n.prep === "in" ? "out of" : "off";
   const into = n.prep === "in" ? "into" : "onto";
   const prepCap = n.prep === "in" ? "In" : "On";

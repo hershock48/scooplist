@@ -113,7 +113,9 @@ export default async function BoardPage({
     is safe to call before the try below.
   */
   const vHead = await resolveVertical(org.slug);
-  const heading = `${location.name}, ${vHead.nouns.prep} the ${vHead.nouns.surface}`;
+  const heading = vHead.nouns.live
+    ? `${location.name}, ${vHead.nouns.live} now`
+    : `${location.name}, ${vHead.nouns.prep} the ${vHead.nouns.surface}`;
 
   const store = getStore();
   let entries: CaseEntry[];

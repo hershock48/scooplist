@@ -139,6 +139,26 @@ The URL map, per org:
 - `/api/v1/orgs/{org}/case/{location}` is the public feed, same JSON shape
   and additive-only contract as the legacy `/api/v1/case/{location}`
 
+What an owner on the shared deployment does NOT get (Kevin's rulings, 2 Sep
+2026, looking at Copper's account):
+
+- **Business type is ours, not theirs.** It is set at creation through the
+  master route and an owner cannot change it: the header does not link to
+  `/setup`, the page shows a "set up by Glazed Web" note instead of the form,
+  and `POST /api/admin/setup` answers 409 in org mode. Single-tenant installs
+  keep the editable screen (his earlier ruling stands there). To change a
+  business's type, re-run `create-org` with the same slug.
+- **History is per trade.** `history: false` on a preset (tavern today) drops
+  the link and redirects `/history` to `/case`. A scoop shop rotating forty
+  flavors wants the screen; a bar with sixteen handles does not. The data
+  keeps accruing either way.
+- **A trade can have a live word.** `nouns.live` on a preset ("pouring" for
+  tavern) turns "In the Copper Athletic Club cooler" into "Pouring at Copper
+  Athletic Club", the case screen's title into "Pouring", and the TV board's
+  heading into "Copper Athletic Club, pouring now". It is read from the
+  preset in code at resolve time, never from the stored row, so a better word
+  reaches every existing business on deploy without touching the database.
+
 Creating an org (upsert, so a re-run rotates a PIN or edits locations):
 
     $env:SCOOPLIST_MASTER = "<the master secret>"

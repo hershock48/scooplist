@@ -29,7 +29,22 @@ export type VerticalNouns = {
   surface: string;
   /** "in" the case/cooler, "on" the board. */
   prep: "in" | "on";
+  /**
+   * The word for "on offer right now" when the trade has one. A bar says a
+   * drink is POURING, not "in the cooler" (Kevin, 2 Sep 2026, looking at
+   * Copper's cocktails), so copy that has this word says "Pouring at
+   * Copper Athletic Club" and "New drink, pouring at ..." instead of
+   * composing around the surface noun. Lowercase gerund; copy capitalizes.
+   * Not stored per business: resolveVertical reads it from the preset in
+   * code, so a better word reaches every existing business on deploy.
+   */
+  live?: string;
 };
+
+/** "Pouring" as a screen title when the vertical has a live word, else "The cooler". */
+export function surfaceTitle(n: VerticalNouns): string {
+  return n.live ? n.live[0].toUpperCase() + n.live.slice(1) : `The ${n.surface}`;
+}
 
 export type PresetKey = "scoops" | "tavern" | "coffee" | "other";
 
@@ -53,11 +68,20 @@ export type Preset = Omit<VerticalConfig, "preset"> & {
   blurb: string;
   /** Whether choosing this preset seeds demo data into an empty library. */
   seeds: boolean;
+  /**
+   * Whether the owner's header offers the History screen. It is the
+   * product's differentiator for a scoop shop rotating forty flavors (how
+   * long each lasted, how often it came back); for a bar with sixteen
+   * handles it is a screen nobody behind the bar opens (Kevin, 2 Sep 2026,
+   * on Copper). The data keeps accruing either way; this is only the door.
+   */
+  history: boolean;
 };
 
 export const PRESETS: Preset[] = [
   {
     key: "scoops",
+    history: true,
     label: "Scoop shop",
     blurb: "Ice cream boards: hand-scooped, soft serve, dairy free, adult.",
     categories: [
@@ -109,13 +133,15 @@ export const PRESETS: Preset[] = [
     sizes: {},
     example: "Bell's Two Hearted",
     voice: "neutral",
-    nouns: { item: "drink", surface: "cooler", prep: "in" },
+    nouns: { item: "drink", surface: "cooler", prep: "in", live: "pouring" },
+    history: false,
     // No demo data: the only bar seed on file is Cascarelli's real ten-board
     // program, which does not fit the generic three boards here.
     seeds: false,
   },
   {
     key: "coffee",
+    history: true,
     label: "Coffee shop",
     blurb: "The rotating board: espresso drinks, brews, seasonal specials.",
     categories: [
@@ -133,6 +159,7 @@ export const PRESETS: Preset[] = [
   },
   {
     key: "other",
+    history: true,
     label: "Something else",
     blurb: "Any rotating menu. Name your own board and what you call a thing.",
     categories: [{ key: "menu", label: "On the Menu" }],

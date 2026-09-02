@@ -47,6 +47,8 @@ export default async function FlavorsPage() {
         boardHref={boardHref(org, shops[0]?.id ?? "")}
         voice={v.voice}
         nouns={v.nouns}
+        preset={v.preset}
+        managed={orgMode()}
         orgName={orgMode() ? org.name : undefined}
       />
 
@@ -57,7 +59,7 @@ export default async function FlavorsPage() {
       </h1>
       <p className="mt-2 text-ink-soft">
         {v.voice === "neutral"
-          ? `The ${v.nouns.surface} pulls from here. Photos, descriptions, and prices live on the ${v.nouns.item}, so they follow it everywhere it goes.`
+          ? `${v.nouns.live ? `What's ${v.nouns.live}` : `The ${v.nouns.surface}`} pulls from here. Photos, descriptions, and prices live on the ${v.nouns.item}, so they follow it everywhere it goes.`
           : "The case pulls from here. Photos, stories, allergens, and prices live on the flavor, so they follow it into every shop and every board."}
       </p>
       {!blobConfigured ? (

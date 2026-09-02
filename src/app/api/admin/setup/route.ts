@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { currentOrg } from "@/lib/org";
+import { currentOrg, orgMode } from "@/lib/org";
 import { configFromPreset, presetByKey } from "@/lib/presets";
 import { invalidateVertical } from "@/lib/vertical";
 import { resetSeedGuard, seedIfEmpty } from "@/lib/seed";
@@ -29,7 +29,11 @@ export async function POST(request: Request) {
   if (!org) {
     return NextResponse.json({ error: "Sign in first." }, { status: 401 });
   }
-  if (process.env.SCOOPLIST_CATEGORIES) {
+  // Shared deployment: the type is set at creation through the master
+  // route and is not the owner's to change (Kevin's ruling, 2 Sep 2026).
+  // Refused here, not only hidden in the header, so a hand-built request
+  // cannot do what the screen will not.
+  if (orgMode() || process.env.SCOOPLIST_CATEGORIES) {
     return NextResponse.json(
       { error: "This deployment's business type is managed by your web person." },
       { status: 409 },
