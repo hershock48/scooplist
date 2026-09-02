@@ -76,12 +76,21 @@ export type Preset = Omit<VerticalConfig, "preset"> & {
    * on Copper). The data keeps accruing either way; this is only the door.
    */
   history: boolean;
+  /**
+   * Whether the trade gets the public TV board at /board/{org}/{location}.
+   * A scoop shop points an in-store screen at it; a bar whose website
+   * already renders the feed has no screen to point (Kevin, 2 Sep 2026,
+   * on Copper: "get rid of the tv board too"). Off means the header drops
+   * the link AND the address 404s, so nothing lingers as a hidden page.
+   */
+  board: boolean;
 };
 
 export const PRESETS: Preset[] = [
   {
     key: "scoops",
     history: true,
+    board: true,
     label: "Scoop shop",
     blurb: "Ice cream boards: hand-scooped, soft serve, dairy free, adult.",
     categories: [
@@ -135,6 +144,7 @@ export const PRESETS: Preset[] = [
     voice: "neutral",
     nouns: { item: "drink", surface: "cooler", prep: "in", live: "pouring" },
     history: false,
+    board: false,
     // No demo data: the only bar seed on file is Cascarelli's real ten-board
     // program, which does not fit the generic three boards here.
     seeds: false,
@@ -142,6 +152,7 @@ export const PRESETS: Preset[] = [
   {
     key: "coffee",
     history: true,
+    board: true,
     label: "Coffee shop",
     blurb: "The rotating board: espresso drinks, brews, seasonal specials.",
     categories: [
@@ -160,6 +171,7 @@ export const PRESETS: Preset[] = [
   {
     key: "other",
     history: true,
+    board: true,
     label: "Something else",
     blurb: "Any rotating menu. Name your own board and what you call a thing.",
     categories: [{ key: "menu", label: "On the Menu" }],

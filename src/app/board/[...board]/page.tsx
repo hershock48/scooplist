@@ -4,6 +4,7 @@ import AutoRefresh from "@/components/AutoRefresh";
 import { byCaseOrder, type CaseEntry, type Flavor } from "@/lib/domain";
 import { DEFAULT_ORG, legacyAliasSlug, orgBySlug, orgMode, type Org } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
+import { presetByKey } from "@/lib/presets";
 import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -113,6 +114,9 @@ export default async function BoardPage({
     is safe to call before the try below.
   */
   const vHead = await resolveVertical(org.slug);
+  // A trade without a TV board (bars) has no page here at all, not a
+  // hidden one: the header stopped linking it, and the address agrees.
+  if (presetByKey(vHead.preset)?.board === false) notFound();
   const heading = vHead.nouns.live
     ? `${location.name}, ${vHead.nouns.live} now`
     : `${location.name}, ${vHead.nouns.prep} the ${vHead.nouns.surface}`;

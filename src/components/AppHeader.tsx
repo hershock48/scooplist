@@ -73,13 +73,15 @@ export default function AppHeader({
     : voice === "neutral"
       ? "The board"
       : "The case";
-  const showHistory = preset ? presetByKey(preset)?.history !== false : true;
+  const p = preset ? presetByKey(preset) : null;
+  const showHistory = p ? p.history !== false : true;
+  const showBoard = p ? p.board !== false : true;
   const items: Item[] = [
     { href: "/case", label: caseLabel },
     { href: "/flavors", label: "Library" },
     ...(showHistory ? [{ href: "/history", label: "History" }] : []),
     ...(managed ? [] : [{ href: "/setup", label: "Business type" }]),
-    { href: boardHref, label: "TV board ↗", external: true },
+    ...(showBoard ? [{ href: boardHref, label: "TV board ↗", external: true }] : []),
   ];
 
   const isCurrent = (href: string) =>

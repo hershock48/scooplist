@@ -152,6 +152,10 @@ What an owner on the shared deployment does NOT get (Kevin's rulings, 2 Sep
   the link and redirects `/history` to `/case`. A scoop shop rotating forty
   flavors wants the screen; a bar with sixteen handles does not. The data
   keeps accruing either way.
+- **The TV board is per trade too.** `board: false` on a preset (tavern)
+  drops the header link and makes `/board/{org}/{location}` 404. A scoop
+  shop points an in-store screen at the board; a bar whose website already
+  renders the feed has nothing to point. The feed itself is untouched.
 - **A trade can have a live word.** `nouns.live` on a preset ("pouring" for
   tavern) turns "In the Copper Athletic Club cooler" into "Pouring at Copper
   Athletic Club", the case screen's title into "Pouring", and the TV board's
