@@ -102,6 +102,8 @@ export type Org = {
   locations: ShopLocation[];
   /** Stored PIN hash; only the auth paths look inside it. */
   pinHash: string;
+  /** The handoff secret shared with the org's own website; "" when none. */
+  handoffKey: string;
 };
 
 /**
@@ -119,6 +121,7 @@ export async function orgBySlug(slug: string): Promise<Org | null> {
       name: shops[0]?.name ?? "Scooplist",
       locations: shops,
       pinHash: "",
+      handoffKey: "",
     };
   }
   if (!validOrgSlug(slug)) return null;
@@ -127,7 +130,13 @@ export async function orgBySlug(slug: string): Promise<Org | null> {
   const shops = Array.isArray(row.data.locations)
     ? row.data.locations.filter((l) => l && l.id).map((l) => ({ id: String(l.id), name: String(l.name ?? l.id) }))
     : [];
-  return { slug: row.slug, name: row.name, locations: shops, pinHash: row.pinHash };
+  return {
+    slug: row.slug,
+    name: row.name,
+    locations: shops,
+    pinHash: row.pinHash,
+    handoffKey: typeof row.data.handoffKey === "string" ? row.data.handoffKey : "",
+  };
 }
 
 /**

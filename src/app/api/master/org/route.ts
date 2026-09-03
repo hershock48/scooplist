@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { hashPin, safeEqual } from "@/lib/auth";
 import { SLUG_RE, orgMode, validOrgSlug } from "@/lib/org";
@@ -38,6 +39,12 @@ type Body = {
    * completes on re-run (the store moves rows in place).
    */
   adoptLegacy?: boolean;
+  /**
+   * Mint a fresh handoff key for the org, invalidating the one its website
+   * holds. Off by default: a re-run to rotate a PIN or edit locations must
+   * not silently break the website's Taps button.
+   */
+  rotateHandoff?: boolean;
 };
 
 const clean = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -129,11 +136,18 @@ export async function POST(request: Request) {
   }
 
   const store = getStore();
+  // The handoff key survives re-runs (the org's website holds a copy) and
+  // is minted only when the org has none, or when rotation is asked for.
+  const existing = await store.getOrg(slug);
+  const handoffKey =
+    b.rotateHandoff === true || !existing?.data.handoffKey
+      ? randomBytes(32).toString("hex")
+      : existing.data.handoffKey;
   await store.upsertOrg({
     slug,
     name,
     pinHash: hashPin(pin),
-    data: { locations, createdAt: Date.now() },
+    data: { locations, createdAt: existing?.data.createdAt ?? Date.now(), handoffKey },
   });
   await store.setSetting(slug, "vertical", config);
   invalidateVertical(slug);
@@ -152,10 +166,14 @@ export async function POST(request: Request) {
     });
   }
 
-  // Never the pin, never the hash: the response is a receipt, not a secret.
+  // Never the pin, never the hash. The handoff key IS returned, once per
+  // run, to the master-secret holder: it exists to be copied into the
+  // org's website env (SCOOPLIST_HANDOFF_KEY there), and this response is
+  // the only place it is ever shown.
   return NextResponse.json({
     ok: true,
     slug,
+    handoffKey,
     urls: {
       login: `/login/${slug}`,
       boards: locations.map((l) => `/board/${slug}/${l.id}`),

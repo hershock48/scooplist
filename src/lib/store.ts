@@ -41,7 +41,17 @@ export type OrgRow = {
   name: string;
   /** Salted scrypt via auth.ts hashPin, never plaintext. */
   pinHash: string;
-  data: { locations: { id: string; name: string }[]; createdAt: number };
+  data: {
+    locations: { id: string; name: string }[];
+    createdAt: number;
+    /**
+     * The org's handoff key: a random secret the org's own website holds,
+     * so its workroom can sign the owner into Scooplist without the PIN
+     * (app/api/handoff). Minted at creation, kept across re-runs, rotated
+     * only on request. Absent on orgs created before the feature.
+     */
+    handoffKey?: string;
+  };
 };
 
 type Store = {

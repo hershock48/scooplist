@@ -139,6 +139,16 @@ The URL map, per org:
 - `/api/v1/orgs/{org}/case/{location}` is the public feed, same JSON shape
   and additive-only contract as the legacy `/api/v1/case/{location}`
 
+**Signed handoff from the org's own website.** An org row carries a random
+`handoffKey`, minted by `create-org` (printed once in its output; re-run with
+`--rotate-handoff` to replace it) and copied into the org's website env. The
+website's own admin area can then send its signed-in owner to
+`/api/handoff?org={slug}&exp={unix seconds}&sig={HMAC-SHA256(key, "slug\nexp")}`
+and she lands on `/case` with the ordinary session cookie, no PIN typed. Links
+live two minutes; a forged or stale one lands on the org's login page like a
+wrong PIN. Built for Copper's workroom (2 Sep 2026), the shape for every
+client site that has an owner panel of its own.
+
 What an owner on the shared deployment does NOT get (Kevin's rulings, 2 Sep
 2026, looking at Copper's account):
 

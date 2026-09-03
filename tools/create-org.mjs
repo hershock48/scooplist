@@ -80,6 +80,9 @@ const body = {
   locations: pairs(locationsRaw).map((p) => ({ id: p.key, name: p.label })),
   ...(categoriesRaw ? { categories: pairs(categoriesRaw).map((p) => ({ key: p.key, label: p.label })) } : {}),
   ...(adoptLegacy ? { adoptLegacy: true } : {}),
+  // A fresh handoff key for the org's website, invalidating the old one.
+  // Otherwise a re-run keeps the key it already has.
+  ...(process.argv.includes("--rotate-handoff") ? { rotateHandoff: true } : {}),
 };
 
 const res = await fetch(`${base}/api/master/org`, {
@@ -103,5 +106,12 @@ if (adoptLegacy) {
   console.log(`  Check the old URLs still answer if SCOOPLIST_LEGACY_ALIAS=${out.slug} is set.`);
 }
 console.log(`  Sign-in link (hand this to the owner): ${base}${out.urls.login}`);
+if (out.handoffKey) {
+  console.log("");
+  console.log("  Handoff key (for the org's own website, SCOOPLIST_HANDOFF_KEY in its env;");
+  console.log("  shown only here, never again; re-run with --rotate-handoff to replace it):");
+  console.log(`    ${out.handoffKey}`);
+  console.log("");
+}
 for (const b of out.urls.boards) console.log(`  TV board: ${base}${b}`);
 for (const f of out.urls.feeds) console.log(`  Feed: ${base}${f}`);
