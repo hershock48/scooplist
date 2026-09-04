@@ -84,11 +84,22 @@ export type Preset = Omit<VerticalConfig, "preset"> & {
    * the link AND the address 404s, so nothing lingers as a hidden page.
    */
   board: boolean;
+  /**
+   * Whether the item editor offers an ABV field. It was always on, which
+   * put "ABV %" next to Blue Moon on an ice cream shop's screen (Kevin,
+   * 4 Sep 2026, on True North). Only a bar prices alcohol by strength.
+   * Read from the preset at resolve time like history and board, so the
+   * field disappears for every existing scoop shop on deploy; any value
+   * already stored is left alone and still rides the feed, because v1 is
+   * additive only and a consumer may be rendering it.
+   */
+  abv: boolean;
 };
 
 export const PRESETS: Preset[] = [
   {
     key: "scoops",
+    abv: false,
     history: true,
     board: true,
     label: "Scoop shop",
@@ -129,6 +140,7 @@ export const PRESETS: Preset[] = [
   },
   {
     key: "tavern",
+    abv: true,
     label: "Bar / tavern",
     blurb: "Tap list and cooler: what's pouring, what's in cans, what's next.",
     categories: [
@@ -151,6 +163,7 @@ export const PRESETS: Preset[] = [
   },
   {
     key: "coffee",
+    abv: false,
     history: true,
     board: true,
     label: "Coffee shop",
@@ -170,6 +183,7 @@ export const PRESETS: Preset[] = [
   },
   {
     key: "other",
+    abv: false,
     history: true,
     board: true,
     label: "Something else",

@@ -40,6 +40,8 @@ type Props = {
   voice: "scoops" | "neutral";
   /** The vertical's own words (presets.ts): flavor/case, drink/cooler… */
   nouns: VerticalNouns;
+  /** Per-trade: only a bar prices by strength (presets.ts abv). */
+  showAbv: boolean;
   inCase: Record<string, string[]>;
 };
 
@@ -65,7 +67,7 @@ async function resizeToJpeg(file: File): Promise<{ data: string; contentType: st
   }
 }
 
-export default function FlavorLibrary({ flavors, shops, categories, allergenOptions, example, voice, nouns, inCase }: Props) {
+export default function FlavorLibrary({ flavors, shops, categories, allergenOptions, example, voice, nouns, showAbv, inCase }: Props) {
   const noun = voice === "neutral" ? nouns.item : "flavor";
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -318,6 +320,7 @@ export default function FlavorLibrary({ flavors, shops, categories, allergenOpti
                       categories={categories}
                       allergenOptions={allergenOptions}
                       markDirty={() => (dirtyRef.current = true)}
+                      showAbv={showAbv}
                       working={working}
                     />
                   ) : null}
@@ -393,6 +396,7 @@ function FlavorEditor({
   categories,
   allergenOptions,
   markDirty,
+  showAbv,
   working,
 }: {
   flavor: Flavor;
@@ -402,6 +406,7 @@ function FlavorEditor({
   save: (patch: Record<string, unknown>, note?: string) => Promise<Flavor | null>;
   setError: (e: string) => void;
   markDirty: () => void;
+  showAbv: boolean;
   working: boolean;
 }) {
   const [name, setName] = useState(flavor.name);
@@ -543,10 +548,15 @@ function FlavorEditor({
       {/*
         The collaborator gets a FIELD, not a sentence. The seed proved the
         need twice before beer did: Cascarelli Cashew's maker was buried in
-        prose where nothing could style, filter, or link it. ABV rides along
-        for the drinks verticals; blank means it never renders anywhere.
+        prose where nothing could style, filter, or link it.
+
+        ABV is per trade (presets.ts): a bar prices alcohol by strength, an
+        ice cream shop does not, and "ABV %" next to Blue Moon was the first
+        thing Kevin caught on True North's account. Hidden means hidden from
+        the FORM only. Any value already stored keeps riding the feed, since
+        v1 is additive and a consumer may be rendering it.
       */}
-      <div className="mt-4 grid gap-4 sm:grid-cols-[1fr_8rem]">
+      <div className={`mt-4 grid gap-4 ${showAbv ? "sm:grid-cols-[1fr_8rem]" : ""}`}>
         <label className="block text-sm font-semibold">
           Made by / with <span className="font-normal text-ink-soft">(if not the shop)</span>
           <input
@@ -556,16 +566,18 @@ function FlavorEditor({
             placeholder="Cascarelli's of Homer"
           />
         </label>
-        <label className="block text-sm font-semibold">
-          ABV %
-          <input
-            value={abv}
-            onChange={(e) => { touch(); setAbv(e.target.value); }}
-            className="field mt-1 font-normal"
-            placeholder="5.2"
-            inputMode="decimal"
-          />
-        </label>
+        {showAbv ? (
+          <label className="block text-sm font-semibold">
+            ABV %
+            <input
+              value={abv}
+              onChange={(e) => { touch(); setAbv(e.target.value); }}
+              className="field mt-1 font-normal"
+              placeholder="5.2"
+              inputMode="decimal"
+            />
+          </label>
+        ) : null}
       </div>
 
       <label className="mt-4 block text-sm font-semibold">
