@@ -103,14 +103,27 @@ export default function AppHeader({
 
   return (
     <header className="flex items-center justify-between gap-3">
+      {/*
+        min-w-0 is load-bearing. A flex item defaults to min-width:auto, so
+        without it this link refuses to shrink below its content and pushes
+        the Menu button off the right edge of a phone (found on the True
+        North account, whose org name is long). Everything that must keep
+        its size is shrink-0; the org name is the one part allowed to
+        truncate, which is what truncate needs a shrinkable parent for.
+
+        On a phone the org name wins the space over the wordmark: the mark
+        still says whose product this is, and the question the header has
+        to answer while someone edits a case is WHOSE case. With no org
+        name (the single-tenant installs) the wordmark stays.
+      */}
       <Link
         href="/case"
-        className="flex items-center gap-2 font-[family-name:var(--font-display)] text-2xl font-bold text-berry"
+        className="flex min-w-0 items-center gap-2 font-[family-name:var(--font-display)] text-2xl font-bold text-berry"
       >
-        <ScooplistMark size={30} />
-        Scooplist
+        <ScooplistMark size={30} className="shrink-0" />
+        <span className={orgName ? "hidden shrink-0 sm:inline" : "shrink-0"}>Scooplist</span>
         {orgName ? (
-          <span className="max-w-40 truncate text-base font-semibold text-ink-soft sm:max-w-56">
+          <span className="min-w-0 truncate text-base font-semibold text-ink-soft sm:max-w-56">
             {orgName}
           </span>
         ) : null}
@@ -138,7 +151,7 @@ export default function AppHeader({
       </nav>
 
       {/* Phones get one button and a panel. */}
-      <div ref={wrap} className="relative sm:hidden">
+      <div ref={wrap} className="relative shrink-0 sm:hidden">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
