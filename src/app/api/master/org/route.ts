@@ -45,6 +45,12 @@ type Body = {
    * not silently break the website's Taps button.
    */
   rotateHandoff?: boolean;
+  /**
+   * The org's website's cache-purge URL, POSTed to (signed with the handoff
+   * key) after every case change. Omit to keep what is stored; "" clears.
+   * Must be https.
+   */
+  siteHook?: string;
 };
 
 const clean = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -135,6 +141,21 @@ export async function POST(request: Request) {
     if (!categories && firstBoard) config.categories = [{ key: "menu", label: firstBoard }];
   }
 
+  let siteHook: string | undefined;
+  if (b.siteHook !== undefined) {
+    siteHook = clean(b.siteHook, 300);
+    if (siteHook) {
+      let ok = false;
+      try {
+        const u = new URL(siteHook);
+        ok = u.protocol === "https:" && !u.username && !u.password;
+      } catch {
+        ok = false;
+      }
+      if (!ok) return NextResponse.json({ error: "siteHook must be an https URL." }, { status: 400 });
+    }
+  }
+
   const store = getStore();
   // The handoff key survives re-runs (the org's website holds a copy) and
   // is minted only when the org has none, or when rotation is asked for.
@@ -147,7 +168,13 @@ export async function POST(request: Request) {
     slug,
     name,
     pinHash: hashPin(pin),
-    data: { locations, createdAt: existing?.data.createdAt ?? Date.now(), handoffKey },
+    data: {
+      locations,
+      createdAt: existing?.data.createdAt ?? Date.now(),
+      handoffKey,
+      // Kept across re-runs unless the body says otherwise, like the key.
+      siteHook: siteHook !== undefined ? siteHook : existing?.data.siteHook ?? "",
+    },
   });
   await store.setSetting(slug, "vertical", config);
   invalidateVertical(slug);
@@ -174,6 +201,7 @@ export async function POST(request: Request) {
     ok: true,
     slug,
     handoffKey,
+    siteHook: siteHook !== undefined ? siteHook : existing?.data.siteHook ?? "",
     urls: {
       login: `/login/${slug}`,
       boards: locations.map((l) => `/board/${slug}/${l.id}`),

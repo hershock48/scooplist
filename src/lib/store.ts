@@ -51,6 +51,12 @@ export type OrgRow = {
      * only on request. Absent on orgs created before the feature.
      */
     handoffKey?: string;
+    /**
+     * Where to POST when this org's case changes, so its website can purge
+     * its caches instead of polling (lib/notify.ts). Set by create-org's
+     * --site-hook; "" or absent means nobody is told.
+     */
+    siteHook?: string;
   };
 };
 

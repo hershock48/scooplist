@@ -104,6 +104,8 @@ export type Org = {
   pinHash: string;
   /** The handoff secret shared with the org's own website; "" when none. */
   handoffKey: string;
+  /** The website's cache-purge URL, pinged after every case change; "" when none. */
+  siteHook: string;
 };
 
 /**
@@ -122,6 +124,7 @@ export async function orgBySlug(slug: string): Promise<Org | null> {
       locations: shops,
       pinHash: "",
       handoffKey: "",
+      siteHook: "",
     };
   }
   if (!validOrgSlug(slug)) return null;
@@ -136,6 +139,7 @@ export async function orgBySlug(slug: string): Promise<Org | null> {
     locations: shops,
     pinHash: row.pinHash,
     handoffKey: typeof row.data.handoffKey === "string" ? row.data.handoffKey : "",
+    siteHook: typeof row.data.siteHook === "string" ? row.data.siteHook : "",
   };
 }
 

@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { currentOrg } from "@/lib/org";
+import { after, NextResponse } from "next/server";
+import { currentOrg, type Org } from "@/lib/org";
+import { notifySite } from "@/lib/notify";
 import { newId, type CaseStatus } from "@/lib/domain";
 import { getStore } from "@/lib/store";
 
@@ -17,7 +18,16 @@ export const runtime = "nodejs";
  * closes rather than deletes, the history is future analytics. "status"
  * flips the two in-between states (running low, on deck). "reorder" writes
  * positions in the order given, the wall's order.
+ *
+ * Every successful write ends in done(): the response goes out, then the
+ * org's website is told the case changed (lib/notify.ts), so a kicked keg
+ * leaves the site in seconds rather than at the next poll.
  */
+function done(org: Org) {
+  after(() => notifySite(org));
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(request: Request) {
   const org = await currentOrg();
   if (!org) {
@@ -50,7 +60,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Nothing to reorder." }, { status: 400 });
     }
     await store.reorderCase(org.slug, location.id, ids);
-    return NextResponse.json({ ok: true });
+    return done(org);
   }
 
   // getFlavor is org-scoped, so a pasted id from another org misses here
@@ -60,14 +70,14 @@ export async function POST(request: Request) {
 
   if (b.action === "out") {
     await store.closeCaseEntry(org.slug, location.id, flavor.id, Date.now());
-    return NextResponse.json({ ok: true });
+    return done(org);
   }
 
   if (b.action === "status") {
     const status: CaseStatus | null =
       b.status === "low" || b.status === "ondeck" ? b.status : null;
     await store.setCaseStatus(org.slug, location.id, flavor.id, status);
-    return NextResponse.json({ ok: true });
+    return done(org);
   }
 
   if (b.action === "in") {
@@ -86,7 +96,7 @@ export async function POST(request: Request) {
       removedAt: null,
       position: positions.length > 0 ? Math.max(...positions) + 1 : open.length,
     });
-    return NextResponse.json({ ok: true });
+    return done(org);
   }
 
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });

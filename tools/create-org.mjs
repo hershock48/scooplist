@@ -61,12 +61,17 @@ const preset = arg("preset");
 const locationsRaw = arg("locations");
 const categoriesRaw = arg("categories");
 const adoptLegacy = process.argv.includes("--adopt-legacy");
+// The org's website's cache-purge URL. Scooplist POSTs there, signed with
+// the handoff key, after every case change, so the site updates in seconds
+// instead of at its next poll. Omitted, a re-run keeps the stored one;
+// --site-hook "" clears it.
+const siteHook = arg("site-hook");
 
 if (!url || !slug || !name || !pin || !preset || !locationsRaw) {
   console.error(
     "Usage: node tools/create-org.mjs --url <deployment> --slug <org> " +
       '--name "<Org Name>" --pin <pin> --preset scoops|tavern|coffee|other ' +
-      '--locations "slug:Name,..." [--categories "key:Label,..."] [--adopt-legacy]',
+      '--locations "slug:Name,..." [--categories "key:Label,..."] [--site-hook https://...] [--adopt-legacy]',
   );
   process.exit(1);
 }
@@ -83,6 +88,7 @@ const body = {
   // A fresh handoff key for the org's website, invalidating the old one.
   // Otherwise a re-run keeps the key it already has.
   ...(process.argv.includes("--rotate-handoff") ? { rotateHandoff: true } : {}),
+  ...(siteHook !== undefined ? { siteHook } : {}),
 };
 
 const res = await fetch(`${base}/api/master/org`, {
@@ -113,5 +119,10 @@ if (out.handoffKey) {
   console.log(`    ${out.handoffKey}`);
   console.log("");
 }
+console.log(
+  out.siteHook
+    ? `  Site hook: ${out.siteHook} (pinged after every case change)`
+    : "  Site hook: none; the org's website polls the feed instead (add --site-hook to push)",
+);
 for (const b of out.urls.boards) console.log(`  TV board: ${base}${b}`);
 for (const f of out.urls.feeds) console.log(`  Feed: ${base}${f}`);

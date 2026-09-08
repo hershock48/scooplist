@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { currentOrg } from "@/lib/org";
+import { notifySite } from "@/lib/notify";
 import { newId, type Allergen, type CategoryKey, type Flavor, type Size } from "@/lib/domain";
 import { resolveVertical, sizesForCategory } from "@/lib/vertical";
 import { getStore } from "@/lib/store";
@@ -126,5 +127,8 @@ export async function POST(request: Request) {
   };
 
   await store.upsertFlavor(org.slug, flavor);
+  // A renamed or re-described drink that is on the case is a changed feed;
+  // tell the website (lib/notify.ts) once the response is out.
+  after(() => notifySite(org));
   return NextResponse.json({ ok: true, flavor });
 }

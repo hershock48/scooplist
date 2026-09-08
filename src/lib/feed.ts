@@ -95,9 +95,12 @@ export async function buildCaseFeed(org: Org, locationSlug: string): Promise<Nex
     {
       headers: {
         "Access-Control-Allow-Origin": "*",
-        // A menu that can change mid-scoop: cache briefly at the edge,
-        // serve stale while refreshing rather than blocking a page.
-        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=300",
+        // Five seconds at the edge and no stale-while-revalidate. This used
+        // to be 30s + 300s stale, which was fine when every consumer polled
+        // anyway and became the one layer still serving an old list after
+        // the site had been told to refresh (lib/notify.ts). The sites keep
+        // their own fallbacks, so a slow origin costs a page nothing.
+        "Cache-Control": "public, max-age=0, s-maxage=5",
       },
     },
   );

@@ -149,6 +149,21 @@ live two minutes; a forged or stale one lands on the org's login page like a
 wrong PIN. Built for Copper's workroom (2 Sep 2026), the shape for every
 client site that has an owner panel of its own.
 
+**The case pushes to the org's website.** An org row can also carry a
+`siteHook` (create-org `--site-hook https://...`; omitted on a re-run it is
+kept, `""` clears it). After every case write (in, out, low, on deck,
+reorder) and every flavor save, `lib/notify.ts` POSTs there from inside
+next/server's `after()`, so the bar gets its response first, with
+`x-scooplist-org`, `x-scooplist-timestamp` and `x-scooplist-signature` =
+HMAC-SHA256(handoffKey, "slug\ntimestamp"). The site verifies with the
+same key it already holds for the handoff and purges its own caches;
+copperac's `app/api/scooplist/revalidate` is the reference. Built 8 Sep
+2026 after a beer added at Copper took minutes to reach the site through
+three polling layers. The feed's edge cache dropped from 30s plus five
+minutes stale to five seconds and no stale-while-revalidate at the same
+time, since the sites keep their own fallbacks. An org with no hook is
+polled exactly as before.
+
 What an owner on the shared deployment does NOT get (Kevin's rulings, 2 Sep
 2026, looking at Copper's account):
 
