@@ -89,6 +89,9 @@ export default async function HistoryPage() {
   if (presetByKey(v.preset)?.history === false) redirect("/case");
 
   const store = getStore();
+  // A server component rendered per request: the clock IS the input here
+  // ("days on the board" counts to now), not an impurity to hoist out.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const shops = org.locations;
   const [flavors, entries] = await Promise.all([
