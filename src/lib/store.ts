@@ -306,23 +306,53 @@ function connectionString(): string | undefined {
 
 type PgPool = {
   query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
+  end?: () => Promise<void>;
 };
 
+/**
+ * ONE promise for pool-plus-schema, assigned before the first await, and a
+ * failed init is never cached. The earlier shape cached the Pool and the
+ * schema query separately: two callers on a cold start each awaited the
+ * import and both built a Pool (the second overwrote the first, which
+ * leaked), and a schema query that failed once (a Neon blip while the
+ * lambda warmed) left a REJECTED promise in the global, so every request
+ * that instance ever served afterwards failed the same way until the
+ * platform recycled it. Found in copperac's copy of this store first
+ * (20 Oct 2026); same fix here. The 42P07/23505 cases are two workers
+ * racing the same CREATE: the table exists, which is what we wanted.
+ */
 async function pgPool(): Promise<PgPool> {
-  const g = globalThis as typeof globalThis & { __scooplistPool?: PgPool; __scooplistReady?: Promise<unknown> };
-  if (!g.__scooplistPool) {
-    // Dynamic import so the dependency never loads unless a database is
-    // actually configured (devine/pjs pattern, unchanged).
-    const { Pool } = await import("pg");
-    const cs = connectionString();
-    // Local hosts (any spelling) get no forced TLS; cloud Postgres requires it.
-    const local = /localhost|127\.0\.0\.1|\[::1\]/.test(cs ?? "") || cs?.includes("sslmode=disable");
-    g.__scooplistPool = new Pool({
-      connectionString: cs,
-      ssl: local ? undefined : { rejectUnauthorized: false },
-      max: 3,
-    }) as unknown as PgPool;
-    g.__scooplistReady = g.__scooplistPool.query(`
+  const g = globalThis as typeof globalThis & { __scooplistReady?: Promise<PgPool> };
+  if (!g.__scooplistReady) {
+    g.__scooplistReady = (async () => {
+      let pool: PgPool | undefined;
+      try {
+        // Dynamic import so the dependency never loads unless a database is
+        // actually configured (devine/pjs pattern, unchanged).
+        const { Pool } = await import("pg");
+        const cs = connectionString();
+        // Local hosts (any spelling) get no forced TLS; cloud Postgres requires it.
+        const local = /localhost|127\.0\.0\.1|\[::1\]/.test(cs ?? "") || cs?.includes("sslmode=disable");
+        pool = new Pool({
+          connectionString: cs,
+          ssl: local ? undefined : { rejectUnauthorized: false },
+          max: 3,
+        }) as unknown as PgPool;
+        await pool.query(SCHEMA);
+        return pool;
+      } catch (err: unknown) {
+        const code = (err as { code?: string } | null)?.code;
+        if (pool && (code === "23505" || code === "42P07")) return pool;
+        g.__scooplistReady = undefined;
+        if (pool?.end) await pool.end().catch(() => {});
+        throw err;
+      }
+    })();
+  }
+  return g.__scooplistReady;
+}
+
+const SCHEMA = `
       CREATE TABLE IF NOT EXISTS scooplist_flavors (
         id text PRIMARY KEY,
         name text NOT NULL,
@@ -361,11 +391,7 @@ async function pgPool(): Promise<PgPool> {
         pin_hash text NOT NULL,
         data jsonb NOT NULL
       );
-    `);
-  }
-  await g.__scooplistReady;
-  return g.__scooplistPool;
-}
+    `;
 
 const postgresStore: Store = {
   backend: "postgres",

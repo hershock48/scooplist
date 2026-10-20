@@ -9,6 +9,8 @@ export const runtime = "nodejs";
 
 const clean = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
+export const DESCRIPTION_MAX = 600;
+
 function cleanSizes(v: unknown): Size[] | null {
   if (!Array.isArray(v)) return null;
   const sizes = v
@@ -99,7 +101,11 @@ export async function POST(request: Request) {
   const flavor: Flavor = {
     id: existing?.id ?? newId("flv"),
     name,
-    description: b.description !== undefined ? clean(b.description, 300) : existing?.description ?? "",
+    // 600, not 300: a tavern's cocktail story runs long (Copper's "Curse of
+    // Bobby Layne" is 430 characters and the old cap cut it mid-sentence on
+    // the live site, 20 Oct 2026). A truncated description saves "ok" and
+    // reads as a typo everywhere, so the cap is what a menu card can hold.
+    description: b.description !== undefined ? clean(b.description, DESCRIPTION_MAX) : existing?.description ?? "",
     category,
     allergens,
     tags,

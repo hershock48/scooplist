@@ -255,7 +255,9 @@ export default function CaseBoard({ shops, categories, flavors, example, voice, 
         body: JSON.stringify(body),
       });
       if (res.status === 401) {
-        window.location.href = "/login";
+        // A full navigation on purpose: the cookie is gone, so the server
+        // renders the gate, and client state from the old session with it.
+        window.location.assign("/login");
         return null;
       }
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
