@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
+import { seeOther } from "@/lib/redirect";
 import { safeEqual, setAuthCookie } from "@/lib/auth";
 import { orgBySlug, orgMode, validOrgSlug } from "@/lib/org";
 
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
   const exp = Number(url.searchParams.get("exp") ?? "");
   const sig = url.searchParams.get("sig") ?? "";
 
-  const fail = (where: string) => NextResponse.redirect(new URL(where, request.url), 303);
+  const fail = (where: string) => seeOther(where);
   if (!validOrgSlug(slug)) return fail("/login?bad=1");
 
   const now = Math.floor(Date.now() / 1000);
@@ -54,5 +55,5 @@ export async function GET(request: Request) {
   if (!/^[a-f0-9]{64}$/.test(sig) || !safeEqual(sig, expected)) return fail(`/login/${slug}?bad=1`);
 
   await setAuthCookie({ slug: org.slug, pinHash: org.pinHash });
-  return NextResponse.redirect(new URL("/case", request.url), 303);
+  return seeOther("/case");
 }
