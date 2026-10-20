@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { seeOther } from "@/lib/redirect";
 import { checkPin, pinLocked, recordPinResult, setAuthCookie, verifyPin } from "@/lib/auth";
 import { orgBySlug, orgMode, validOrgSlug } from "@/lib/org";
 
@@ -38,32 +38,32 @@ export async function POST(request: Request) {
 
   if (!orgMode()) {
     if (pinLocked(addr)) {
-      return NextResponse.redirect(new URL("/login?locked=1", request.url), 303);
+      return seeOther("/login?locked=1");
     }
     if (!checkPin(addr, pin)) {
       const flag = pinLocked(addr) ? "locked" : "bad";
-      return NextResponse.redirect(new URL(`/login?${flag}=1`, request.url), 303);
+      return seeOther(`/login?${flag}=1`);
     }
     await setAuthCookie();
-    return NextResponse.redirect(new URL("/case", request.url), 303);
+    return seeOther("/case");
   }
 
   // The slug is re-validated BEFORE it goes anywhere near a redirect URL;
   // an invalid one lands on the plain login page, never reflected.
   if (!validOrgSlug(orgSlug)) {
-    return NextResponse.redirect(new URL("/login?bad=1", request.url), 303);
+    return seeOther("/login?bad=1");
   }
   const key = `${orgSlug}|${addr}`;
   if (pinLocked(key)) {
-    return NextResponse.redirect(new URL(`/login/${orgSlug}?locked=1`, request.url), 303);
+    return seeOther(`/login/${orgSlug}?locked=1`);
   }
   const org = await orgBySlug(orgSlug);
   const ok = Boolean(org && org.pinHash && verifyPin(pin.trim(), org.pinHash));
   recordPinResult(key, ok);
   if (!ok || !org) {
     const flag = pinLocked(key) ? "locked" : "bad";
-    return NextResponse.redirect(new URL(`/login/${orgSlug}?${flag}=1`, request.url), 303);
+    return seeOther(`/login/${orgSlug}?${flag}=1`);
   }
   await setAuthCookie({ slug: org.slug, pinHash: org.pinHash });
-  return NextResponse.redirect(new URL("/case", request.url), 303);
+  return seeOther("/case");
 }
