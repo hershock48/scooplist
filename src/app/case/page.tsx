@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import CaseBoard from "@/components/CaseBoard";
 import AppHeader from "@/components/AppHeader";
-import { boardHref, currentOrg, orgMode } from "@/lib/org";
+import { boardHref, currentOrg, managedType, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
 import { surfaceTitle } from "@/lib/presets";
 import { seedIfEmpty } from "@/lib/seed";
@@ -57,7 +57,7 @@ export default async function CasePage() {
         voice={v.voice}
         nouns={v.nouns}
         preset={v.preset}
-        managed={orgMode()}
+        managed={managedType()}
         orgName={orgMode() ? org.name : undefined}
       />
 

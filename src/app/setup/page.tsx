@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import SetupForm from "@/components/SetupForm";
-import { boardHref, currentOrg, orgMode } from "@/lib/org";
+import { boardHref, currentOrg, managedType, orgMode } from "@/lib/org";
 import { resolveVertical } from "@/lib/vertical";
 import { presetByKey } from "@/lib/presets";
 import { getStore } from "@/lib/store";
@@ -43,7 +43,7 @@ export default async function SetupPage() {
         voice={v.voice}
         nouns={v.nouns}
         preset={v.preset}
-        managed={orgMode()}
+        managed={managedType()}
         orgName={orgMode() ? org.name : undefined}
       />
 
@@ -53,10 +53,10 @@ export default async function SetupPage() {
       <p className="mt-2 text-ink-soft">
         The boards, the starting prices, the allergen chips, and the words
         the app uses all follow from this.
-        {v.source === "env" || orgMode() ? "" : " You can change it here any time."}
+        {managedType() ? "" : " You can change it here any time."}
       </p>
 
-      {v.source === "env" || orgMode() ? (
+      {managedType() ? (
         <div className="card mt-6 px-5 py-5">
           <p className="font-semibold">
             Set up by Glazed Web: {presetByKey(v.preset)?.label ?? v.preset}.

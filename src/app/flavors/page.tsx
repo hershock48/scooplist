@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import FlavorLibrary from "@/components/FlavorLibrary";
 import AppHeader from "@/components/AppHeader";
 import { blobToken } from "@/lib/blob";
-import { boardHref, currentOrg, orgMode } from "@/lib/org";
+import { boardHref, currentOrg, managedType, orgMode } from "@/lib/org";
 import { presetByKey } from "@/lib/presets";
 import { resolveVertical } from "@/lib/vertical";
 import { seedIfEmpty } from "@/lib/seed";
@@ -49,7 +49,7 @@ export default async function FlavorsPage() {
         voice={v.voice}
         nouns={v.nouns}
         preset={v.preset}
-        managed={orgMode()}
+        managed={managedType()}
         orgName={orgMode() ? org.name : undefined}
       />
 

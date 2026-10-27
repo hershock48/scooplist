@@ -38,6 +38,20 @@ export function orgMode(): boolean {
 }
 
 /**
+ * Whether the business type is ours to set and not the owner's to change.
+ * True on the shared deployment (Kevin's ruling, 2 Sep 2026) and on every
+ * env-pinned install, where SCOOPLIST_CATEGORIES already decides the boards
+ * and the setup route already refuses a change. Until now the header still
+ * offered "Business type" on the pinned installs and the screen behind it
+ * was read-only, which is a link to a dead end; the Cascarelli's owner
+ * should never see a setting that is not theirs. Same condition the
+ * /api/admin/setup guard uses, kept in one place so they cannot drift.
+ */
+export function managedType(): boolean {
+  return orgMode() || Boolean(process.env.SCOOPLIST_CATEGORIES);
+}
+
+/**
  * "default" is reserved so no real org can collide with the legacy
  * sentinel's rows or settings. The rest protect current and future
  * top-level URL space (/login/{org} and /board/{org}/... must never be
